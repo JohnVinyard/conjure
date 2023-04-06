@@ -1,4 +1,5 @@
 from hashlib import sha1
+import json
 from typing import Callable
 import dill as pickle
 
@@ -9,7 +10,7 @@ class FunctionIdentifier(object):
     
     def derive_name(self, fn: Callable) -> bytes:
         raise NotImplementedError()
-    
+
 
 
 class FunctionNameIdentifier(FunctionIdentifier):
@@ -18,7 +19,6 @@ class FunctionNameIdentifier(FunctionIdentifier):
     
     def derive_name(self, fn: Callable) -> bytes:
         return fn.__name__
-
 
 
 
@@ -45,3 +45,39 @@ class FunctionContentIdentifier(FunctionIdentifier):
     
     def derive_name(self, fn: Callable) -> bytes:
         return self._hash_function(fn)
+
+
+
+
+class ParamsIdentifier(object):
+    def __init__(self):
+        super().__init__()
+    
+    def derive_name(self, *args, **kwargs) -> bytes:
+        pass
+
+
+class ParamsHash(ParamsIdentifier):
+    def __init__(self):
+        super().__init__()
+    
+    def _hash_args(self, *args, **kwargs):
+        args_hash = sha1()
+        args_hash.update(pickle.dumps(args))
+        args_hash.update(pickle.dumps(kwargs))
+        args_hash = args_hash.hexdigest()
+        return args_hash
+
+    def derive_name(self, *args, **kwargs) -> bytes:
+        return self._hash_args(*args, **kwargs)
+
+
+class ParamsJSON(ParamsIdentifier):
+    def __init__(self):
+        super().__init__()
+    
+    def derive_name(self, *args, **kwargs) -> bytes:
+        if len(args):
+            raise ValueError('ParamsJSONSerializer does not support non-keyword arguments')
+        
+        return json.dumps(kwargs)
