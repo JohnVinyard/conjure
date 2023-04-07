@@ -1,7 +1,18 @@
-from typing import Iterable
+from typing import Iterable, Union
 import lmdb
 import boto3
 from shutil import rmtree
+
+
+def ensure_bytes(value: Union[str, bytes, memoryview]) -> bytes:
+    if isinstance(value, memoryview):
+        return bytes(value)
+
+    return value if isinstance(value, bytes) else value.encode()
+
+
+def ensure_str(value: Union[str, bytes]) -> str:
+    return value if isinstance(value, str) else value.decode()
 
 class Collection(object):
     def __init__(self):
@@ -32,57 +43,80 @@ class S3Collection(Collection):
         self.client = boto3.client('s3')
         self.content_type = content_type
         self.is_public = is_public
+        self._create_bucket()
+    
+    @property
+    def acl(self):
+        return 'public-read' if self.is_public else 'private'
+    
+    def destroy(self):
+        # first, delete all keys
+        for key in self.iter_prefix(''):
+            print(f'deleting key {key}')
+            self.client.delete_object(Bucket=self.bucket, Key=key)
+        
+        print(f'deleting bucket {self.bucket}')
+        self.client.delete_bucket(Bucket=self.bucket)
+    
+    def __delitem__(self, key):
+        raise NotImplementedError()    
+
+    def _create_bucket(self):
+        # TODO: CORS settings for bucket
+        try:
+            self.client.create_bucket(
+                ACL=self.acl,
+                Bucket=self.bucket)
+        except self.client.exceptions.BucketAlreadyExists:
+            pass
     
     def __contains__(self, key):
         try:
             # TODO: This could be a head request
-            self[key]
+            self[ensure_str(key)]
             return True
         except KeyError:
             return False
 
-    def __delitem__(self, key):
-        raise NotImplementedError()    
     
-    def iter_prefix(self, start_key, prefix=None):
+    
+    def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[None, bytes, str]=None) -> Iterable[bytes]:
 
-        if isinstance(start_key, str):
-            start_key = start_key.encode()
-
-        if prefix is None:
-            prefix = start_key
-        elif isinstance(prefix, str):
-            prefix = prefix.encode()
         
-        cont = None
+
+        resp = self.client.list_objects_v2(
+            Bucket=self.bucket,
+            StartAfter=ensure_str(start_key),
+            Prefix=ensure_str(prefix) if prefix is not None else '',
+        )
+        contents = resp['Contents']
 
         while True:
-            resp = self.client.list_objects_v2(
-                Bucket=self.bucket,
-                StartAfter=start_key,
-                Prefix=prefix,
-                ContinuationToken=cont
-            )
-            contents = resp['Contents']
             for content in contents:
-                yield content['Key']
+                yield ensure_bytes(content['Key'])
             
             if resp['IsTruncated']:
-                cont = resp['ContinuationToken']
+                resp = self.client.list_objects_v2(
+                    Bucket=self.bucket,
+                    StartAfter=ensure_str(start_key),
+                    Prefix=ensure_str(prefix) if prefix is not None else '',
+                    ContinuationToken=resp['NextContinuationToken']
+                )
+                contents = resp['Contents']
             else:
                 break
     
-    def __setitem__(self, key: bytes, value: bytes):
+    def __setitem__(self, key: Union[bytes, str], value: bytes):
         self.client.put_object(
             Bucket=self.bucket, 
-            Key=key, 
+            Key=ensure_str(key), 
             Body=value, 
             ContentType=self.content_type,
-            ACL='public-read' if self.is_public else 'private')
+            ACL=self.acl)
 
-    def __getitem__(self, key) -> bytes:
+    def __getitem__(self, key: Union[str, bytes]) -> bytes:
         try:
-            resp = self.client.get_object(Bucket=self.bucket, Key=key)
+            resp = self.client.get_object(Bucket=self.bucket, Key=ensure_str(key))
             return resp['Body'].read()
         except:
             raise KeyError(key)
@@ -104,45 +138,39 @@ class LmdbCollection(Collection):
         self.env.close()
         rmtree(self.path)
     
-    def __contains__(self, key):
+    def __contains__(self, key: Union[str, bytes]):
         try:
-            self[key]
+            self[ensure_bytes(key)]
             return True
         except KeyError:
             return False
 
-    def iter_prefix(self, start_key, prefix=None):
+    def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[str, bytes, None]=None):
 
-        if isinstance(start_key, str):
-            start_key = start_key.encode()
-
-        if prefix is None:
-            prefix = start_key
-        elif isinstance(prefix, str):
-            prefix = prefix.encode()
 
         with self.env.begin(write=True, buffers=True) as txn:
             cursor = txn.cursor()
-            cursor.set_range(start_key)
+            cursor.set_range(ensure_bytes(start_key))
 
             it = cursor.iternext(keys=True, values=False)
             for key in it:
-                key = bytes(key)
-                if not key.startswith(prefix):
+                key = ensure_bytes(key)
+                if prefix is not None and not key.startswith(prefix):
                     break
-                yield txn, key
+                yield key
     
-    def __delitem__(self, key):
+    def __delitem__(self, key: Union[str, bytes]):
         with self.env.begin(write=True) as txn:
-            txn.delete(key)
+            txn.delete(ensure_bytes(key))
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Union[str, bytes], value: Union[str, bytes]):
+
         with self.env.begin(write=True, buffers=True) as txn:
-            txn.put(key, value)
+            txn.put(ensure_bytes(key), ensure_bytes(value))
 
     def __getitem__(self, key):
         with self.env.begin(buffers=True, write=False) as txn:
-            value = txn.get(key)
+            value = txn.get(ensure_bytes(key))
             if value is None:
                 raise KeyError(key)
             return value
