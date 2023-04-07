@@ -1,12 +1,8 @@
-from typing import Callable
 from unittest import TestCase
-import unittest
 from urllib.parse import urlparse
 from uuid import uuid4 as v4
-import os
 from conjure.storage import LmdbCollection, LocalCollectionWithBackup
 import logging
-from time import sleep
 
 logging.getLogger('boto3').setLevel(logging.CRITICAL)
 logging.getLogger('botocore').setLevel(logging.CRITICAL)
@@ -14,20 +10,6 @@ logging.getLogger('nose').setLevel(logging.CRITICAL)
 logging.getLogger('s3transfer').setLevel(logging.CRITICAL)
 
 
-
-def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
-    exc = None
-    for i in range(max_tries):
-        try:
-            func()
-        except Exception as e:
-            exc = e
-            sleep(wait_time_seconds)
-            continue
-        
-        return
-
-    raise exc
 
 class TestExploratory(TestCase):
 

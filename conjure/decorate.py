@@ -58,9 +58,6 @@ class Conjure(object):
     def remove_listener(self, listener: WriteListener) -> None:
         self.listeners.remove(listener)
 
-    def serve(self, port='8888'):
-        raise NotImplementedError()
-
     def exists(self, *args, **kwargs):
         key = self.key(*args, **kwargs)
         return key in self.storage

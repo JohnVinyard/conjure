@@ -1,20 +1,72 @@
 import json
+from multiprocessing import Process
+from time import sleep
+from typing import Union
 from unittest import TestCase
+import requests
+
+from traitlets import Callable
 
 from conjure.decorate import WriteNotification, json_conjure
+from conjure.serve import serve_conjure
 from conjure.storage import LmdbCollection
 from uuid import uuid4 as v4
 
 
+def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
+    exc = None
+    for i in range(max_tries):
+        print(f'Try number {i}')
+        try:
+            func()
+            return
+        except Exception as e:
+            exc = e
+            sleep(wait_time_seconds)
+            continue
+        
+
+    raise exc
+
 class DecorateTests(TestCase):
 
     def setUp(self) -> None:
+        self.process: Union[Process, None] = None
         self.path = f'/tmp/{v4().hex}'
         self.db = LmdbCollection(self.path)
 
     def tearDown(self) -> None:
         self.db.destroy()
+
+        if self.process is not None and self.process.is_alive():
+            self.process.join(5)
+            self.process.terminate()
     
+
+    def test_can_serve(self):
+        @json_conjure(self.db)
+        def make_bigger(d: dict) -> dict:
+            d = dict(**d)
+            keys = list(d.keys())
+            for key in keys:
+                d[f'{key}_bigger'] = d[key] * 10
+            return d
+
+
+        make_bigger({'a': 10, 'b': 3})
+        make_bigger({'z': 11, 'b': 3})
+
+        self.process = serve_conjure(
+            make_bigger, port=9999, n_workers=1, revive=False)
+
+        def get_keys_over_http():
+            resp = requests.get('http://localhost:9999/', verify=False)
+            print(resp)
+            keys = resp.json()
+            self.assertEqual(2, len(keys))
+        
+        retry(get_keys_over_http)
+
 
     def test_can_iterate_keys_when_storage_is_shared(self):
         @json_conjure(self.db)
