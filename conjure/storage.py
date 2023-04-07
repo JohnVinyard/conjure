@@ -172,7 +172,7 @@ class LmdbCollection(Collection):
             value = txn.get(ensure_bytes(key))
             if value is None:
                 raise KeyError(key)
-            return value
+            return bytes(value)
 
 
 
