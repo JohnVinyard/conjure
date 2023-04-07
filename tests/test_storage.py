@@ -46,6 +46,9 @@ class TestExploratory(TestCase):
     # def tearDownClass(cls) -> None:
     #     for key in cls.db.iter_prefix(start_key=''):
     #         del cls.db[key]    
+
+
+
         
     def test_supports_public_uri(self):
         key = v4().hex

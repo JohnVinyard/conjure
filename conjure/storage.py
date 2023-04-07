@@ -20,6 +20,9 @@ class Collection(object):
     def __init__(self):
         super().__init__()
 
+    def content_length(self, key) -> int:
+        raise NotImplementedError()
+
     def __contains__(self, key):
         raise NotImplementedError()
 
@@ -61,6 +64,14 @@ class S3Collection(Collection):
     @property
     def acl(self):
         return 'public-read' if self.is_public else 'private'
+
+    def content_length(self, key) -> int:
+        try:
+            resp = self.client.get_object_attribute(
+                Bucket=self.bucket, Key=self.key)
+            return resp['ObjectSize']
+        except self.client.NoSuchKey:
+            raise KeyError(key)
 
     def destroy(self):
         # first, delete all keys
@@ -148,6 +159,14 @@ class LmdbCollection(Collection):
         self.env.close()
         rmtree(self.path)
 
+    def content_length(self, key) -> int:
+        with self.env.begin(buffers=True, write=False) as txn:
+            value = txn.get(ensure_bytes(key))
+            if value is None:
+                raise KeyError(key)
+
+            return len(value)
+
     def __contains__(self, key: Union[str, bytes]):
         try:
             self[ensure_bytes(key)]
@@ -207,7 +226,13 @@ class LocalCollectionWithBackup(Collection):
         else:
             self._remote = S3Collection(
                 remote_bucket, content_type, is_public=is_public)
-    
+
+    def content_length(self, key) -> int:
+        try:
+            return self._local.content_length(key)
+        except KeyError:
+            return self._remote.content_length(key)
+
     def public_uri(self, key) -> ParseResult:
         return self._remote.public_uri(key)
 
@@ -215,7 +240,7 @@ class LocalCollectionWithBackup(Collection):
         self._local.destroy()
         if self.local_backup:
             self._remote.destroy()
-    
+
     def __delitem__(self, key):
         del self._local[key]
         del self._remote[key]

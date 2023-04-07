@@ -28,6 +28,31 @@ class TestNumpyStorage(TestCase):
     
     def tearDown(self) -> None:
         self.db.destroy()
+    
+    def test_can_get_metadata(self):
+        def get_spec_mag(x: np.ndarray) -> np.ndarray:
+            spec = np.fft.rfft(x, axis=-1, norm='ortho')
+            return np.abs(spec).astype(np.float32)
+        
+        conj = Conjure(
+            callable=get_spec_mag, 
+            content_type='application/octet-stream',
+            storage=self.db,
+            func_identifier=LiteralFunctionIdentifier('numpy_test'),
+            param_identifier=ParamsHash(),
+            serializer=NumpySerializer(),
+            deserializer=AllOnesDeserializer())
+        
+        arr = np.random.normal(0, 1, (3, 7, 8))
+
+        computed_result = conj.__call__(arr)
+        self.assertFalse(np.allclose(computed_result, 1))
+        
+        meta = conj.meta(arr)
+
+        self.assertEqual(meta.public_uri, None)
+        self.assertEqual('application/octet-stream', meta.content_type)
+        
 
     def test_can_store_and_retrieve_array(self):
 

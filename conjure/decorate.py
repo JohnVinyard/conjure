@@ -4,6 +4,15 @@ from conjure.serialize import Deserializer, JSONDeserializer, JSONSerializer, Se
 from conjure.storage import Collection
 
 
+class MetaData(object):
+    def __init__(self, key, public_uri, content_type, content_length):
+        super().__init__()
+        self.key = key
+        self.public_uri = public_uri
+        self.content_type =content_type
+        self.content_length = content_length
+
+
 class Conjure(object):
 
     def __init__(
@@ -33,6 +42,24 @@ class Conjure(object):
     def exists(self, *args, **kwargs):
         key = self.key(*args, **kwargs)
         return key in self.storage
+    
+    def meta(self, *args, **kwargs):
+        key = self.key(*args, **kwargs)
+
+        # KLUDGE: Implement "head" requests to get object
+        # size without reading into memory/pulling from s3
+
+        uri = None
+        try:
+            uri = self.storage.public_uri(key)
+        except NotImplementedError:
+            pass
+        
+        return MetaData(
+            key=key, 
+            public_uri=uri, 
+            content_type=self.content_type, 
+            content_length=self.storage.content_length(key))
 
     @property
     def identifier(self):
