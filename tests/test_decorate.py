@@ -1,7 +1,7 @@
 import json
 from unittest import TestCase
 
-from conjure.decorate import json_conjure
+from conjure.decorate import WriteNotification, json_conjure
 from conjure.storage import LmdbCollection
 from uuid import uuid4 as v4
 
@@ -14,6 +14,31 @@ class DecorateTests(TestCase):
 
     def tearDown(self) -> None:
         self.db.destroy()
+    
+
+    def test_can_register_listener(self):
+        @json_conjure(self.db)
+        def make_bigger(d: dict) -> dict:
+            d = dict(**d)
+            keys = list(d.keys())
+            for key in keys:
+                d[f'{key}_bigger'] = d[key] * 10
+            return d
+
+        notifications = []
+
+        def listen(notifiction: WriteNotification):
+            notifications.append(notifiction)
+
+        make_bigger.register_listener(listen)        
+
+        make_bigger({'a': 10, 'b': 3})
+        make_bigger({'z': 11, 'b': 3})
+
+        self.assertEqual(2, len(notifications))
+
+        self.assertNotEqual(notifications[0].key, notifications[1].key)
+
 
     def test_can_get_object_metadata(self):
 

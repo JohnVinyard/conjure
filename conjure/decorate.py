@@ -1,3 +1,4 @@
+import datetime
 from typing import Callable
 from conjure.identifier import FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
 from conjure.serialize import Deserializer, JSONDeserializer, JSONSerializer, Serializer
@@ -12,6 +13,14 @@ class MetaData(object):
         self.content_type =content_type
         self.content_length = content_length
 
+
+class WriteNotification(object):
+    def __init__(self, key: bytes):
+        self.key = key
+        self.timestamp = datetime.datetime.utcnow()
+
+
+WriteListener = Callable[[WriteNotification], None]
 
 class Conjure(object):
 
@@ -35,6 +44,14 @@ class Conjure(object):
         self.param_identifier = param_identifier
         self.serializer = serializer
         self.deserializer = deserializer
+
+        self.listeners = []
+    
+    def register_listener(self, listener: WriteListener) -> None:
+        self.listeners.append(listener)
+    
+    def remove_listener(self, listener: WriteListener) -> None:
+        self.listeners.remove(listener)
 
     def serve(self, port='8888'):
         raise NotImplementedError()
@@ -81,6 +98,8 @@ class Conjure(object):
             obj = self.callable(*args, **kwargs)
             raw = self.serializer.to_bytes(obj)
             self.storage[key] = raw
+            for listener in self.listeners:
+                listener(WriteNotification(key))
             return obj
 
 
