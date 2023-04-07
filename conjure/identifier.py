@@ -12,6 +12,14 @@ class FunctionIdentifier(object):
         raise NotImplementedError()
 
 
+class LiteralFunctionIdentifier(FunctionIdentifier):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+    
+    def derive_name(self, fn: Callable) -> bytes:
+        return self.name
+
 
 class FunctionNameIdentifier(FunctionIdentifier):
     def __init__(self):

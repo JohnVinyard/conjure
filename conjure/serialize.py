@@ -1,5 +1,7 @@
 import dill
 from typing import Any, BinaryIO
+from io import BytesIO
+import numpy as np
 
 class Serializer(object):
     def __init__(self):
@@ -21,3 +23,35 @@ class Deserializer(object):
 
     def read(self, sink: BinaryIO) -> Any:
         raise NotImplementedError()
+    
+
+
+
+class NumpySerializer(Serializer):
+    def __init__(self):
+        super().__init__()
+    
+    def to_bytes(self, content: np.ndarray) -> bytes:
+        bio = BytesIO()
+        np.save(bio, content)
+        bio.seek(0)
+        return bio.read()
+    
+    def write(self, content: np.ndarray, sink: BinaryIO) -> None:
+        np.save(sink, content)
+
+
+class NumpyDeserializer(Deserializer):
+    def __init__(self):
+        super().__init__()
+    
+    def from_bytes(self, encoded: bytes) -> np.ndarray:
+        bio = BytesIO()
+        bio.write(encoded)
+        bio.seek(0)
+        output = self.read(bio)
+        return output
+    
+    def read(self, sink: BinaryIO) -> np.ndarray:
+        output = np.load(sink)
+        return output

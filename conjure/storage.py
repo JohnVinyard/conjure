@@ -82,7 +82,6 @@ class S3Collection(Collection):
     
     def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[None, bytes, str]=None) -> Iterable[bytes]:
 
-        
 
         resp = self.client.list_objects_v2(
             Bucket=self.bucket,
