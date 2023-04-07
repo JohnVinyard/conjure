@@ -1,6 +1,6 @@
 from .serialize import \
     Serializer, Deserializer, NumpySerializer, NumpyDeserializer, \
-    JSONDeserializer, JSONSerializer
+    JSONDeserializer, JSONSerializer, PickleDeserializer, PickleSerializer
 from .identifier import \
     FunctionContentIdentifier, FunctionNameIdentifier, ParamsHash, \
     ParamsIdentifier, ParamsJSON, LiteralFunctionIdentifier

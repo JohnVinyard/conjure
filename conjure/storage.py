@@ -1,4 +1,5 @@
 from typing import Iterable, Union
+from urllib.parse import ParseResult, urlparse
 import lmdb
 import boto3
 from shutil import rmtree
@@ -14,23 +15,27 @@ def ensure_bytes(value: Union[str, bytes, memoryview]) -> bytes:
 def ensure_str(value: Union[str, bytes]) -> str:
     return value if isinstance(value, str) else value.decode()
 
+
 class Collection(object):
     def __init__(self):
         super().__init__()
-    
+
     def __contains__(self, key):
         raise NotImplementedError()
-    
+
     def iter_prefix(self, start_key, prefix=None) -> Iterable[bytes]:
         raise NotImplementedError()
 
     def __setitem__(self, key: bytes, value: bytes):
         raise NotImplementedError()
-    
+
     def __getitem__(self, key) -> bytes:
         raise NotImplementedError()
-    
+
     def __delitem__(self, key):
+        raise NotImplementedError()
+
+    def public_uri(self, key) -> ParseResult:
         raise NotImplementedError()
 
 
@@ -44,22 +49,30 @@ class S3Collection(Collection):
         self.content_type = content_type
         self.is_public = is_public
         self._create_bucket()
-    
+
+    def public_uri(self, key: Union[bytes, str]):
+        if not self.is_public:
+            raise NotImplementedError()
+
+        uri = f'https://{self.bucket}.s3.amazonaws.com/{ensure_str(key)}'
+        parsed = urlparse(uri)
+        return parsed
+
     @property
     def acl(self):
         return 'public-read' if self.is_public else 'private'
-    
+
     def destroy(self):
         # first, delete all keys
         for key in self.iter_prefix(''):
             print(f'deleting key {key}')
             self.client.delete_object(Bucket=self.bucket, Key=key)
-        
+
         print(f'deleting bucket {self.bucket}')
         self.client.delete_bucket(Bucket=self.bucket)
-    
+
     def __delitem__(self, key):
-        raise NotImplementedError()    
+        raise NotImplementedError()
 
     def _create_bucket(self):
         # TODO: CORS settings for bucket
@@ -69,7 +82,7 @@ class S3Collection(Collection):
                 Bucket=self.bucket)
         except self.client.exceptions.BucketAlreadyExists:
             pass
-    
+
     def __contains__(self, key):
         try:
             # TODO: This could be a head request
@@ -78,10 +91,7 @@ class S3Collection(Collection):
         except KeyError:
             return False
 
-    
-    
-    def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[None, bytes, str]=None) -> Iterable[bytes]:
-
+    def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[None, bytes, str] = None) -> Iterable[bytes]:
 
         resp = self.client.list_objects_v2(
             Bucket=self.bucket,
@@ -93,7 +103,7 @@ class S3Collection(Collection):
         while True:
             for content in contents:
                 yield ensure_bytes(content['Key'])
-            
+
             if resp['IsTruncated']:
                 resp = self.client.list_objects_v2(
                     Bucket=self.bucket,
@@ -104,18 +114,19 @@ class S3Collection(Collection):
                 contents = resp['Contents']
             else:
                 break
-    
+
     def __setitem__(self, key: Union[bytes, str], value: bytes):
         self.client.put_object(
-            Bucket=self.bucket, 
-            Key=ensure_str(key), 
-            Body=value, 
+            Bucket=self.bucket,
+            Key=ensure_str(key),
+            Body=value,
             ContentType=self.content_type,
             ACL=self.acl)
 
     def __getitem__(self, key: Union[str, bytes]) -> bytes:
         try:
-            resp = self.client.get_object(Bucket=self.bucket, Key=ensure_str(key))
+            resp = self.client.get_object(
+                Bucket=self.bucket, Key=ensure_str(key))
             return resp['Body'].read()
         except:
             raise KeyError(key)
@@ -132,11 +143,11 @@ class LmdbCollection(Collection):
             writemap=True,
             map_async=True,
             metasync=True)
-    
+
     def destroy(self):
         self.env.close()
         rmtree(self.path)
-    
+
     def __contains__(self, key: Union[str, bytes]):
         try:
             self[ensure_bytes(key)]
@@ -144,8 +155,7 @@ class LmdbCollection(Collection):
         except KeyError:
             return False
 
-    def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[str, bytes, None]=None):
-
+    def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[str, bytes, None] = None):
 
         with self.env.begin(write=True, buffers=True) as txn:
             cursor = txn.cursor()
@@ -157,7 +167,7 @@ class LmdbCollection(Collection):
                 if prefix is not None and not key.startswith(prefix):
                     break
                 yield key
-    
+
     def __delitem__(self, key: Union[str, bytes]):
         with self.env.begin(write=True) as txn:
             txn.delete(ensure_bytes(key))
@@ -175,17 +185,15 @@ class LmdbCollection(Collection):
             return bytes(value)
 
 
-
-
 class LocalCollectionWithBackup(Collection):
     def __init__(
-            self, 
-            local_path, 
-            remote_bucket, 
-            content_type, 
-            is_public=False, 
+            self,
+            local_path,
+            remote_bucket,
+            content_type,
+            is_public=False,
             local_backup=False):
-        
+
         super().__init__()
         self.content_type = content_type
         self.local_backup = local_backup
@@ -200,16 +208,22 @@ class LocalCollectionWithBackup(Collection):
             self._remote = S3Collection(
                 remote_bucket, content_type, is_public=is_public)
     
+    def public_uri(self, key) -> ParseResult:
+        return self._remote.public_uri(key)
+
     def destroy(self):
         self._local.destroy()
         if self.local_backup:
             self._remote.destroy()
     
+    def __delitem__(self, key):
+        del self._local[key]
+        del self._remote[key]
+
     def iter_prefix(self, start_key, prefix=None) -> Iterable[bytes]:
         # KLUDGE: What if we're starting from scratch on a new local machine
         # and the remote has everything?
         return self._local.iter_prefix(start_key, prefix)
-    
 
     def __contains__(self, key):
         try:
@@ -217,7 +231,6 @@ class LocalCollectionWithBackup(Collection):
             return True
         except KeyError:
             return False
-
 
     def __getitem__(self, key) -> bytes:
         # first, try local
@@ -231,7 +244,7 @@ class LocalCollectionWithBackup(Collection):
         resp = self._remote[key]
         self._local[key] = resp
         return resp
-    
+
     def __setitem__(self, key: bytes, value: bytes):
         # first set the key locally
         self._local[key] = value

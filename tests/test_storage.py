@@ -1,6 +1,7 @@
 from typing import Callable
 from unittest import TestCase
 import unittest
+from urllib.parse import urlparse
 from uuid import uuid4 as v4
 import os
 from conjure.storage import LmdbCollection, LocalCollectionWithBackup
@@ -34,15 +35,26 @@ class TestExploratory(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.path = v4().hex
+        cls.bucket_name = 'conjure-test'
         cls.db = LocalCollectionWithBackup(
             f'/tmp/{cls.path}', 
-            remote_bucket='conjure-test', 
+            remote_bucket=cls.bucket_name, 
             content_type='text/plain',
             is_public=True)
     
-    @classmethod
-    def tearDownClass(cls) -> None:
-        pass
+    # @classmethod
+    # def tearDownClass(cls) -> None:
+    #     for key in cls.db.iter_prefix(start_key=''):
+    #         del cls.db[key]    
+        
+    def test_supports_public_uri(self):
+        key = v4().hex
+        value = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
+        self.db[key] = value
+
+        self.assertEqual(
+            urlparse(f'https://conjure-test.s3.amazonaws.com/{key}'), 
+            self.db.public_uri(key))
 
     def exists_after_write(self):
         key = v4().hex
@@ -98,6 +110,13 @@ class TestStorage(TestCase):
 
     def tearDown(self) -> None:
         self.db.destroy()
+    
+    def test_does_not_support_public_uri(self):
+        key = b'key'
+        value = b'value'
+        self.db[key] = value
+
+        self.assertRaises(NotImplementedError, lambda: self.db.public_uri(key))
 
     def test_writes_go_to_both_databases(self):
         key = b'key'
