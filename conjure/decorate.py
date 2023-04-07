@@ -1,22 +1,7 @@
-from hashlib import sha1
-import pickle
 from typing import Callable
 from conjure.identifier import FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
 from conjure.serialize import Deserializer, JSONDeserializer, JSONSerializer, Serializer
 from conjure.storage import Collection
-import numpy as np
-import lmdb
-import struct
-
-
-# class Wrapped(object):
-#     def __init__(self, callable, func_hash):
-#         super().__init__()
-#         self.func_hash = func_hash
-#         self.callable = callable
-
-#     def __call__(self, *args, **kwargs):
-#         return self.callable(*args, **kwargs)
 
 
 class Conjure(object):
@@ -70,74 +55,6 @@ class Conjure(object):
             raw = self.serializer.to_bytes(obj)
             self.storage[key] = raw
             return obj
-
-# def non_generator_func(f, h, collection, serialize, deserialize, arg_hasher):
-#     def x(*args, **kwargs):
-#         args_hash = arg_hasher(*args, **kwargs)
-#         key = f'{h}:{args_hash}'.encode()
-#         try:
-#             cached = deserialize(*collection[key])
-#             return cached
-#         except KeyError:
-#             pass
-
-#         try:
-#             result = f(*args, **kwargs)
-#             collection[key] = serialize(result)
-#         except NoCache as nc:
-#             result = nc.value
-#         return result
-
-#     return x
-
-
-# def dump_pickle(x):
-#     s = pickle.dumps(x, pickle.HIGHEST_PROTOCOL)
-#     return memoryview(s)
-
-
-# def numpy_array_dumpb(arr):
-#     arr = np.ascontiguousarray(arr, dtype=np.float32)
-#     shape = pickle.dumps(arr.shape)
-#     shape_bytes = struct.pack('i', len(shape))
-#     return memoryview(shape_bytes + shape + arr.tobytes())
-
-
-# def load_pickle(memview, txn):
-#     return pickle.loads(memview)
-
-
-# def numpy_array_loadb(memview, txn):
-#     shape_len = struct.unpack('i', memview[:4])[0]
-#     shape = pickle.loads(memview[4: 4 + shape_len])
-#     raw = np.asarray(memview[4 + shape_len:], dtype=np.uint8)
-#     arr = raw.view(dtype=np.float32).reshape(shape)
-#     return NumpyWrapper(arr, txn)
-
-
-# def cache(
-#         collection,
-#         serialize=numpy_array_dumpb,
-#         deserialze=numpy_array_loadb,
-#         arg_hasher=hash_args):
-
-#     '''
-#     TODO:
-#         - Collection should support getitem, setitem and....
-#         - encoder should implement dump, load and MIME/content type
-#         - hasher should define how the function and its arguments are serialized into a key, ideally
-#             in a human-readable way, e.g. stft_(1234, 512, 256)
-#         - indices should be created for each argument whose type is supported, e.g., strings, numbers,
-#             dates, so that it'd be possible to search for all stft invocations with window size 1024
-
-#     '''
-
-#     def deco(f):
-#         h = hash_function(f)
-#         return Wrapped(
-#             non_generator_func(f, h, collection, serialize, deserialze, arg_hasher), h)
-
-#     return deco
 
 
 def conjure(
