@@ -176,9 +176,13 @@ class LmdbCollection(Collection):
 
     def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[str, bytes, None] = None):
 
+        start_key = ensure_bytes(start_key)
+        if prefix is None:
+            prefix = start_key
+
         with self.env.begin(write=True, buffers=True) as txn:
             cursor = txn.cursor()
-            cursor.set_range(ensure_bytes(start_key))
+            cursor.set_range(start_key)
 
             it = cursor.iternext(keys=True, values=False)
             for key in it:

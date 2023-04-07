@@ -46,6 +46,11 @@ class Conjure(object):
         self.deserializer = deserializer
 
         self.listeners = []
+
+    
+    def iter_keys(self):
+        for key in self.storage.iter_prefix(f'{self.identifier}'.encode()):
+            yield key
     
     def register_listener(self, listener: WriteListener) -> None:
         self.listeners.append(listener)
