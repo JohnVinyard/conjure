@@ -18,7 +18,7 @@ document.addEventListener(
         data.forEach(({ key, timestamp }) => {
           list.insertAdjacentHTML(
             "afterbegin",
-            `<li><a target="_blank" href="/results/${key}">${timestamp} - ${key}</a></li>`
+            `<li><a target="_blank" href="/results/${key}">${key}</a></li>`
           );
         });
         if (data.length > 0) {
