@@ -10,8 +10,26 @@ class MetaData(object):
         super().__init__()
         self.key = key
         self.public_uri = public_uri
-        self.content_type =content_type
+        self.content_type = content_type
         self.content_length = content_length
+
+
+class ResultWithMetadata(object):
+    def __init__(self, raw: bytes, meta: MetaData):
+        self.raw = raw
+        self.meta = meta
+
+    @property
+    def public_uri(self):
+        return self.meta.public_uri
+
+    @property
+    def content_type(self):
+        return self.meta.content_type
+
+    @property
+    def content_length(self):
+        return self.meta.content_length
 
 
 class WriteNotification(object):
@@ -21,6 +39,7 @@ class WriteNotification(object):
 
 
 WriteListener = Callable[[WriteNotification], None]
+
 
 class Conjure(object):
 
@@ -47,21 +66,20 @@ class Conjure(object):
 
         self.listeners = []
 
-    
     def iter_keys(self):
         for key in self.storage.iter_prefix(f'{self.identifier}'.encode()):
             yield key
-    
+
     def register_listener(self, listener: WriteListener) -> None:
         self.listeners.append(listener)
-    
+
     def remove_listener(self, listener: WriteListener) -> None:
         self.listeners.remove(listener)
 
     def exists(self, *args, **kwargs):
         key = self.key(*args, **kwargs)
         return key in self.storage
-    
+
     def meta(self, *args, **kwargs):
         key = self.key(*args, **kwargs)
 
@@ -73,11 +91,11 @@ class Conjure(object):
             uri = self.storage.public_uri(key)
         except NotImplementedError:
             pass
-        
+
         return MetaData(
-            key=key, 
-            public_uri=uri, 
-            content_type=self.content_type, 
+            key=key,
+            public_uri=uri,
+            content_type=self.content_type,
             content_length=self.storage.content_length(key))
 
     @property
@@ -89,6 +107,25 @@ class Conjure(object):
 
     def key(self, *args, **kwargs) -> bytes:
         return f'{self.identifier}{self.key_delimiter}{self.identify_params(*args, **kwargs)}'.encode()
+
+    def get_raw(self, key):
+        raw = self.storage[key]
+
+        public_uri = None
+        try:
+            public_uri = self.storage.public_uri(key)
+        except NotImplementedError:
+            pass
+
+        return ResultWithMetadata(
+            raw,
+            MetaData(
+                key=key,
+                public_uri=public_uri,
+                content_type=self.content_type,
+                content_length=self.storage.content_length(key)
+            )
+        )
 
     def __call__(self, *args, **kwargs):
         key = self.key(*args, **kwargs)

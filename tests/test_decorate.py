@@ -43,6 +43,7 @@ class DecorateTests(TestCase):
             self.process.terminate()
     
 
+
     def test_can_serve(self):
         @json_conjure(self.db)
         def make_bigger(d: dict) -> dict:
@@ -53,7 +54,7 @@ class DecorateTests(TestCase):
             return d
 
 
-        make_bigger({'a': 10, 'b': 3})
+        result = make_bigger({'a': 10, 'b': 3})
         make_bigger({'z': 11, 'b': 3})
 
         self.process = serve_conjure(
@@ -61,11 +62,16 @@ class DecorateTests(TestCase):
 
         def get_keys_over_http():
             resp = requests.get('http://localhost:9999/', verify=False)
-            print(resp)
             keys = resp.json()
             self.assertEqual(2, len(keys))
         
         retry(get_keys_over_http)
+
+        meta = make_bigger.meta({'a': 10, 'b': 3})
+        resp = requests.get(f'http://localhost:9999/{meta.key.decode()}')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('application/json', resp.headers['content-type'])
+        self.assertEqual(json.dumps(result), resp.content.decode())
 
 
     def test_can_iterate_keys_when_storage_is_shared(self):
