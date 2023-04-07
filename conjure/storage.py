@@ -169,11 +169,9 @@ class LmdbCollection(Collection):
     
 
     def feed(self, offset: Union[bytes, str] = None):
-        print('OFFSET IS --------------', offset)
         for i, key in enumerate(self.iter_prefix(offset, db=self._feed)):
             if offset and i == 0:
                 continue
-            print(i, key)
             with self.env.begin(buffers=True, write=False, db=self._feed) as txn:
                 memoryview_value = txn.get(key)
                 value = bytes(memoryview_value)

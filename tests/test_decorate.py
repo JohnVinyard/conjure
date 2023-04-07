@@ -16,7 +16,6 @@ from uuid import uuid4 as v4
 def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
     exc = None
     for i in range(max_tries):
-        print(f'Try number {i}')
         try:
             func()
             return

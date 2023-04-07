@@ -70,10 +70,7 @@ class TestExploratory(TestCase):
 
         self.assertEqual(set(keys), set(read_keys))
 
-        # sleep(10)
-
         backup_keys = list(filter(lambda x: x in keys, self.db._remote.iter_prefix('')))
-        print(backup_keys)
 
         self.assertEqual(set(backup_keys), set(read_keys))
         
@@ -185,11 +182,8 @@ class TestStorage(TestCase):
         
 
         feed_items = list(self.db.feed(offset=''))
-        for item in feed_items:
-            print(item)
 
         middle = feed_items[4]['timestamp']
-        print(middle)
         truncated_feed = list(self.db.feed(offset=middle))
 
         self.assertEqual(5, len(truncated_feed))

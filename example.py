@@ -36,7 +36,6 @@ if __name__ == '__main__':
         def write():
             for i in range(100):
                 make_bigger({ 'g': i })
-                print('CALLING', i)
                 sleep(1)
 
         t = threading.Thread(target=write, args=())

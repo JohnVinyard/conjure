@@ -73,7 +73,6 @@ class Feed(object):
     def on_get(self, req: falcon.Request, res: falcon.Response):
         offset = req.get_param('offset')
         items = list(self.conjure.feed(offset))
-        print(f'{offset} has {len(items)}')
         res.media = list(
             map(lambda x: {key: value.decode() for key, value in x.items()}, items))
         res.status = falcon.HTTP_OK
@@ -133,7 +132,6 @@ def serve_conjure(
     app = Application(conjure)
 
     def worker_int(worker):
-        print('SIGNAL', worker, revive)
         if not revive:
             print('Exit because of worker failure')
             sys.exit(1)
