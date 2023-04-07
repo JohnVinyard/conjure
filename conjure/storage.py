@@ -4,6 +4,8 @@ import lmdb
 import boto3
 from shutil import rmtree
 
+from conjure.timestamp import timestamp_id
+
 
 def ensure_bytes(value: Union[str, bytes, memoryview]) -> bytes:
     if isinstance(value, memoryview):
@@ -39,6 +41,9 @@ class Collection(object):
         raise NotImplementedError()
 
     def public_uri(self, key) -> ParseResult:
+        raise NotImplementedError()
+    
+    def feed(self, offset: Union[bytes, str] = None):
         raise NotImplementedError()
 
 
@@ -154,13 +159,28 @@ class LmdbCollection(Collection):
             writemap=True,
             map_async=True,
             metasync=True)
+        self._data = self.env.open_db(b'data')
+        self._feed = self.env.open_db(b'feed')
 
     def destroy(self):
         self.env.close()
         rmtree(self.path)
+    
+
+    def feed(self, offset: Union[bytes, str] = None):
+        print('OFFSET IS --------------', offset)
+        for i, key in enumerate(self.iter_prefix(offset, db=self._feed)):
+            if offset and i == 0:
+                continue
+            print(i, key)
+            with self.env.begin(buffers=True, write=False, db=self._feed) as txn:
+                memoryview_value = txn.get(key)
+                value = bytes(memoryview_value)
+                # a tuple of (uuid v1, key)
+                yield { 'timestamp': key, 'key': value }
 
     def content_length(self, key) -> int:
-        with self.env.begin(buffers=True, write=False) as txn:
+        with self.env.begin(buffers=True, write=False, db=self._data) as txn:
             value = txn.get(ensure_bytes(key))
             if value is None:
                 raise KeyError(key)
@@ -174,13 +194,20 @@ class LmdbCollection(Collection):
         except KeyError:
             return False
 
-    def iter_prefix(self, start_key: Union[str, bytes], prefix: Union[str, bytes, None] = None):
+    def iter_prefix(
+            self, 
+            start_key: Union[str, bytes], 
+            prefix: Union[str, bytes, None]=None, 
+            db=None):
+
+        if db is None:
+            db = self._data
 
         start_key = ensure_bytes(start_key)
-        if prefix is None:
-            prefix = start_key
+        if prefix is not None:
+            prefix = ensure_bytes(prefix)
 
-        with self.env.begin(write=True, buffers=True) as txn:
+        with self.env.begin(write=True, buffers=True, db=db) as txn:
             cursor = txn.cursor()
             cursor.set_range(start_key)
 
@@ -192,16 +219,18 @@ class LmdbCollection(Collection):
                 yield key
 
     def __delitem__(self, key: Union[str, bytes]):
-        with self.env.begin(write=True) as txn:
+        with self.env.begin(write=True, db=self._data) as txn:
             txn.delete(ensure_bytes(key))
 
     def __setitem__(self, key: Union[str, bytes], value: Union[str, bytes]):
-
-        with self.env.begin(write=True, buffers=True) as txn:
-            txn.put(ensure_bytes(key), ensure_bytes(value))
+        with self.env.begin(write=True, buffers=True, db=self._data) as txn:
+            key = ensure_bytes(key)
+            txn.put(key, ensure_bytes(value))
+            timestamp = timestamp_id()
+            txn.put(timestamp, key, db=self._feed)
 
     def __getitem__(self, key):
-        with self.env.begin(buffers=True, write=False) as txn:
+        with self.env.begin(buffers=True, write=False, db=self._data) as txn:
             value = txn.get(ensure_bytes(key))
             if value is None:
                 raise KeyError(key)
@@ -230,6 +259,9 @@ class LocalCollectionWithBackup(Collection):
         else:
             self._remote = S3Collection(
                 remote_bucket, content_type, is_public=is_public)
+    
+    def feed(self, offset: Union[bytes, str] = None):
+        return self._local.feed(offset)
 
     def content_length(self, key) -> int:
         try:

@@ -7,4 +7,4 @@ from .identifier import \
 from .storage import LocalCollectionWithBackup, LmdbCollection, S3Collection
 from .decorate import Conjure, conjure, json_conjure, MetaData, WriteNotification
 from .serve import serve_conjure
-
+from .timestamp import timestamp_id

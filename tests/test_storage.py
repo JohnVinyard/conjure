@@ -96,6 +96,7 @@ class TestStorage(TestCase):
     def tearDown(self) -> None:
         self.db.destroy()
     
+    
     def test_does_not_support_public_uri(self):
         key = b'key'
         value = b'value'
@@ -152,4 +153,46 @@ class TestStorage(TestCase):
         print(read_keys)
 
         self.assertEqual(set(keys), set(read_keys))
+    
+
+    def test_correct_number_of_keys(self):
+        n_keys = 20
+
+        read_keys = list(self.db.iter_prefix(''))
+        print(read_keys)
+        self.assertEqual(0, len(read_keys))
+
+        keys = [v4().hex.encode() for _ in range(n_keys)]
+        for key in keys:
+            self.db[key] = key
+        
+        read_keys = list(self.db.iter_prefix(''))
+        self.assertEqual(n_keys, len(read_keys))
+    
+    def test_feed_has_correct_number_of_items(self):
+        keys = [v4().hex.encode() for _ in range(10)]
+        for key in keys:
+            self.db[key] = key
+        
+
+        feed_items = list(self.db.feed(offset=''))
+        self.assertEqual(10, len(feed_items))
+
+    def test_feed_respects_offset(self):
+        keys = [v4().hex.encode() for _ in range(10)]
+        for key in keys:
+            self.db[key] = key
+        
+
+        feed_items = list(self.db.feed(offset=''))
+        for item in feed_items:
+            print(item)
+
+        middle = feed_items[4]['timestamp']
+        print(middle)
+        truncated_feed = list(self.db.feed(offset=middle))
+
+        self.assertEqual(5, len(truncated_feed))
+    
+    
 

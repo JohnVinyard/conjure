@@ -5,10 +5,10 @@ import multiprocessing
 import gunicorn.app.base
 import sys
 import os
-from markdown import markdown 
-import re
+from markdown import markdown
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 class RootResource(object):
 
@@ -44,20 +44,40 @@ class Dashboard(object):
     def __init__(self, conjure: Conjure):
         super().__init__()
         self.conjure = conjure
-    
+
     def on_get(self, req: falcon.Request, res: falcon.Response):
+        with open(os.path.join(MODULE_DIR, 'dashboard.mjs'), 'r') as f:
+            script = f.read()
+
         with open(os.path.join(MODULE_DIR, 'dashboard.html'), 'r') as f:
 
-            desc = map(lambda x: x.strip(), self.conjure.description.split('\n'))
+            desc = map(lambda x: x.strip(),
+                       self.conjure.description.split('\n'))
             desc = '\n'.join(desc)
 
             content = f.read()
             res.content_length = len(content)
             res.body = content.format(
-                title=self.conjure.name, 
-                description=markdown(desc))
+                title=self.conjure.name,
+                description=markdown(desc),
+                script=script)
             res.set_header('content-type', 'text/html')
             res.status = falcon.HTTP_OK
+
+
+class Feed(object):
+    def __init__(self, conjure: Conjure, max_size=25):
+        self._events = []
+        self.conjure = conjure
+
+    def on_get(self, req: falcon.Request, res: falcon.Response):
+        offset = req.get_param('offset')
+        items = list(self.conjure.feed(offset))
+        print(f'{offset} has {len(items)}')
+        res.media = list(
+            map(lambda x: {key: value.decode() for key, value in x.items()}, items))
+        res.status = falcon.HTTP_OK
+
 
 class Application(falcon.API):
 
@@ -67,6 +87,7 @@ class Application(falcon.API):
         self.add_route('/', RootResource(conjure))
         self.add_route('/results/{key}', Resource(conjure))
         self.add_route('/dashboard', Dashboard(conjure))
+        self.add_route('/feed', Feed(conjure))
 
 
 def handler_app(environ, start_response):

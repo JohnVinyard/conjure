@@ -2,7 +2,7 @@ import json
 from multiprocessing import Process
 from time import sleep
 from typing import Union
-from unittest import TestCase
+from unittest import TestCase, skip
 import requests
 
 from traitlets import Callable

@@ -1,5 +1,5 @@
 import datetime
-from typing import Callable
+from typing import Callable, Union
 from conjure.identifier import FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
 from conjure.serialize import Deserializer, JSONDeserializer, JSONSerializer, Serializer
 from conjure.storage import Collection
@@ -66,6 +66,9 @@ class Conjure(object):
 
         self.listeners = []
     
+    def feed(self, offset: Union[bytes, str]):
+        return self.storage.feed(offset)
+    
     @property
     def name(self):
         return self.callable.__name__
@@ -75,7 +78,8 @@ class Conjure(object):
         return self.callable.__doc__
 
     def iter_keys(self):
-        for key in self.storage.iter_prefix(f'{self.identifier}'.encode()):
+        offset = f'{self.identifier}'.encode()
+        for key in self.storage.iter_prefix(offset, prefix=offset):
             yield key
 
     def register_listener(self, listener: WriteListener) -> None:
