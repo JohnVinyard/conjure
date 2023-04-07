@@ -1,10 +1,18 @@
 from conjure import json_conjure, serve_conjure
 from conjure.storage import LmdbCollection
+from markdown import markdown
 
 collection = LmdbCollection('http_test')
 
 @json_conjure(collection)
 def make_bigger(d: dict) -> dict:
+    """
+    # Make Bigger
+
+    This function takes a dictionary and makes everything in it bigger!
+
+    
+    """
     d = dict(**d)
     keys = list(d.keys())
     for key in keys:
@@ -13,6 +21,16 @@ def make_bigger(d: dict) -> dict:
 
 
 
+def example_func():
+    """
+    # Here is a doc string
+
+    - this
+    - is
+    - a
+    - list
+    """
+    pass
 
 if __name__ == '__main__':
     make_bigger({'a': 10, 'b': 3})

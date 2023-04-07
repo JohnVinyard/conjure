@@ -24,9 +24,9 @@ def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
             exc = e
             sleep(wait_time_seconds)
             continue
-        
 
     raise exc
+
 
 class DecorateTests(TestCase):
 
@@ -41,8 +41,6 @@ class DecorateTests(TestCase):
         if self.process is not None and self.process.is_alive():
             self.process.join(5)
             self.process.terminate()
-    
-
 
     def test_can_serve(self):
         @json_conjure(self.db)
@@ -52,7 +50,6 @@ class DecorateTests(TestCase):
             for key in keys:
                 d[f'{key}_bigger'] = d[key] * 10
             return d
-
 
         result = make_bigger({'a': 10, 'b': 3})
         make_bigger({'z': 11, 'b': 3})
@@ -64,15 +61,14 @@ class DecorateTests(TestCase):
             resp = requests.get('http://localhost:9999/', verify=False)
             keys = resp.json()
             self.assertEqual(2, len(keys))
-        
+
         retry(get_keys_over_http)
 
         meta = make_bigger.meta({'a': 10, 'b': 3})
-        resp = requests.get(f'http://localhost:9999/{meta.key.decode()}')
+        resp = requests.get(f'http://localhost:9999/results/{meta.key.decode()}')
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.headers['content-type'])
         self.assertEqual(json.dumps(result), resp.content.decode())
-
 
     def test_can_iterate_keys_when_storage_is_shared(self):
         @json_conjure(self.db)
@@ -98,7 +94,6 @@ class DecorateTests(TestCase):
         make_smaller({'a': 11, 'b': 3})
         make_smaller({'j': 11, 'q': 3})
 
-
         bigger_keys = list(make_bigger.iter_keys())
         smaller_keys = list(make_smaller.iter_keys())
 
@@ -120,7 +115,7 @@ class DecorateTests(TestCase):
         def listen(notifiction: WriteNotification):
             notifications.append(notifiction)
 
-        make_bigger.register_listener(listen)        
+        make_bigger.register_listener(listen)
 
         make_bigger({'a': 10, 'b': 3})
         make_bigger({'z': 11, 'b': 3})
@@ -129,6 +124,20 @@ class DecorateTests(TestCase):
 
         self.assertNotEqual(notifications[0].key, notifications[1].key)
 
+    def can_access_description(self):
+
+        @json_conjure(self.db)
+        def make_bigger(d: dict) -> dict:
+            """
+            These are the docs!
+            """
+            d = dict(**d)
+            keys = list(d.keys())
+            for key in keys:
+                d[f'{key}_bigger'] = d[key] * 10
+            return d
+
+        self.assertEqual('These are the docs!', make_bigger.description)
 
     def test_can_get_object_metadata(self):
 
@@ -149,7 +158,8 @@ class DecorateTests(TestCase):
 
         self.assertEqual(key, meta.key)
         self.assertEqual('application/json', meta.content_type)
-        self.assertEqual(len(json.dumps(initial).encode()), meta.content_length)
+        self.assertEqual(len(json.dumps(initial).encode()),
+                         meta.content_length)
         self.assertEqual(None, meta.public_uri)
 
     def test_can_decorate_function(self):

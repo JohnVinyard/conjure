@@ -65,6 +65,14 @@ class Conjure(object):
         self.deserializer = deserializer
 
         self.listeners = []
+    
+    @property
+    def name(self):
+        return self.callable.__name__
+
+    @property
+    def description(self):
+        return self.callable.__doc__
 
     def iter_keys(self):
         for key in self.storage.iter_prefix(f'{self.identifier}'.encode()):
