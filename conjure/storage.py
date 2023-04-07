@@ -7,6 +7,9 @@ class Collection(object):
     def __init__(self):
         super().__init__()
     
+    def __contains__(self, key):
+        raise NotImplementedError()
+    
     def iter_prefix(self, start_key, prefix=None) -> Iterable[bytes]:
         raise NotImplementedError()
 
@@ -29,6 +32,14 @@ class S3Collection(Collection):
         self.client = boto3.client('s3')
         self.content_type = content_type
         self.is_public = is_public
+    
+    def __contains__(self, key):
+        try:
+            # TODO: This could be a head request
+            self[key]
+            return True
+        except KeyError:
+            return False
 
     def __delitem__(self, key):
         raise NotImplementedError()    
@@ -79,6 +90,7 @@ class S3Collection(Collection):
 
 class LmdbCollection(Collection):
     def __init__(self, path):
+        super().__init__()
         self.path = path
         self.env = lmdb.open(
             self.path,
@@ -91,6 +103,13 @@ class LmdbCollection(Collection):
     def destroy(self):
         self.env.close()
         rmtree(self.path)
+    
+    def __contains__(self, key):
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
 
     def iter_prefix(self, start_key, prefix=None):
 
@@ -122,11 +141,11 @@ class LmdbCollection(Collection):
             txn.put(key, value)
 
     def __getitem__(self, key):
-        txn = self.env.begin(buffers=True, write=False)
-        value = txn.get(key)
-        if value is None:
-            raise KeyError(key)
-        return value, txn
+        with self.env.begin(buffers=True, write=False) as txn:
+            value = txn.get(key)
+            if value is None:
+                raise KeyError(key)
+            return value
 
 
 
@@ -163,6 +182,15 @@ class LocalCollectionWithBackup(Collection):
         # KLUDGE: What if we're starting from scratch on a new local machine
         # and the remote has everything?
         return self._local.iter_prefix(start_key, prefix)
+    
+
+    def __contains__(self, key):
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
+
 
     def __getitem__(self, key) -> bytes:
         # first, try local
