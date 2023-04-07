@@ -158,7 +158,8 @@ class LmdbCollection(Collection):
             map_size=10e10,
             writemap=True,
             map_async=True,
-            metasync=True)
+            metasync=True,
+            lock=False)
         self._data = self.env.open_db(b'data')
         self._feed = self.env.open_db(b'feed')
 
