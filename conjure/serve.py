@@ -46,6 +46,13 @@ class Dashboard(object):
         self.conjure = conjure
 
     def on_get(self, req: falcon.Request, res: falcon.Response):
+
+        with open(os.path.join(MODULE_DIR, 'style.css'), 'r') as f:
+            style = f.read()
+
+        with open(os.path.join(MODULE_DIR, 'imports.json'), 'r') as f:
+            imports = f.read()
+
         with open(os.path.join(MODULE_DIR, 'dashboard.mjs'), 'r') as f:
             script = f.read()
 
@@ -60,7 +67,9 @@ class Dashboard(object):
             res.body = content.format(
                 title=self.conjure.name,
                 description=markdown(desc),
-                script=script)
+                script=script,
+                imports=imports,
+                style=style)
             res.set_header('content-type', 'text/html')
             res.status = falcon.HTTP_OK
 
