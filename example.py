@@ -9,7 +9,7 @@ collection = LmdbCollection('http_test')
 @numpy_conjure(collection)
 def spectral_magnitude(arr: np.ndarray):
     spec = np.fft.rfft(arr, axis=-1, norm='ortho')
-    spec = np.abs(spec)
+    spec = np.abs(spec).astype(np.float32)
     return spec
 
 

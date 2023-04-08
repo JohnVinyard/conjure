@@ -24,8 +24,8 @@ const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.maxPolarAngle = Math.PI * 0.5;
 orbitControls.minDistance = 0.1;
 orbitControls.maxDistance = 100;
-orbitControls.autoRotate = true;
-orbitControls.autoRotateSpeed = 1.0;
+// orbitControls.autoRotate = true;
+// orbitControls.autoRotateSpeed = 1.0;
 
 renderer.setAnimationLoop(() => {
   orbitControls.update();
@@ -36,6 +36,39 @@ renderer.setAnimationLoop(() => {
 const fetchData = async (key) => {
   const resp = await fetch(`/results/${key}`);
   console.log(resp);
+};
+
+const dtypeToConstructor = (dtype) => {
+  if (dtype === "<f4") {
+    return Float32Array;
+  }
+
+  throw new Error("Not Implemented");
+};
+
+const renderCubeVisitor = (value, location) => {
+  const [loc] = location;
+
+  const size = 0.5;
+
+  const color = new THREE.Color(1 * value, 0.5 * value, 0.1 * value);
+
+  const geometry = new THREE.BoxGeometry(size, size, size);
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    opacity: 0.1,
+  });
+  const cube = new THREE.Mesh(geometry, material);
+  scene.add(cube);
+  cube.position.x = loc * size;
+};
+
+const visit = (typedArray, shape, visitor) => {
+  for (let i = 0; i < typedArray.length; i++) {
+    // TODO: get "shaped" location in array
+    const location = [i];
+    visitor(typedArray.at(i), location);
+  }
 };
 
 document.addEventListener(
@@ -96,10 +129,24 @@ document.addEventListener(
       const dtypePattern = /('descr':\s+)'([^']+)'/;
       const shapePattern = /('shape':\s+)(\([^/)]+\))/;
 
+      const dtype = str.match(dtypePattern)[2];
+      const rawShape = str.match(shapePattern)[2];
 
-      console.log("HEADER");
-      console.log(str);
+      const hasTrailingComma = rawShape.slice(-2)[0] === ",";
+      const truncated = rawShape.slice(1, hasTrailingComma ? -2 : -1);
+      const massagedShape = `[${truncated}]`;
+      console.log(rawShape);
+      console.log(massagedShape);
 
+      const shape = JSON.parse(massagedShape);
+      const arrayData = new (dtypeToConstructor(dtype))(
+        headerAndData.slice(2 + headerLen)
+      );
+
+      console.log(shape);
+      console.log("ARRAY ELEMENTS", arrayData.length);
+
+      visit(arrayData, shape, renderCubeVisitor);
     });
   },
   false
