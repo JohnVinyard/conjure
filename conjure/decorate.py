@@ -1,7 +1,7 @@
 import datetime
 from typing import Callable, Union
 from conjure.identifier import FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
-from conjure.serialize import Deserializer, JSONDeserializer, JSONSerializer, Serializer
+from conjure.serialize import Deserializer, JSONDeserializer, JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
 from conjure.storage import Collection
 
 
@@ -178,7 +178,7 @@ def conjure(
     return deco
 
 
-def json_conjure(storage=Collection, tag_deserialized=False):
+def json_conjure(storage: Collection, tag_deserialized=False):
 
     return conjure(
         content_type='application/json',
@@ -187,4 +187,15 @@ def json_conjure(storage=Collection, tag_deserialized=False):
         param_identifier=ParamsHash(),
         serializer=JSONSerializer(),
         deserializer=JSONDeserializer(tag_deserialized=tag_deserialized)
+    )
+
+def numpy_conjure(storage: Collection):
+
+    return conjure(
+        content_type='application/octet-stream',
+        storage=storage,
+        func_identifier=FunctionContentIdentifier(),
+        param_identifier=ParamsHash(),
+        serializer=NumpySerializer(),
+        deserializer=NumpyDeserializer()
     )
