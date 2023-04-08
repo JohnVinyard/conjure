@@ -1,29 +1,10 @@
 import numpy as np
 from conjure import numpy_conjure, serve_conjure
 from conjure.storage import LmdbCollection
-from time import sleep
-import random
-import threading
-import shutil
 
-from conjure.timestamp import timestamp_id
 
 collection = LmdbCollection('http_test')
 
-# @json_conjure(collection)
-# def make_bigger(d: dict) -> dict:
-#     """
-#     # Make Bigger
-
-#     This function takes a dictionary and makes everything in it bigger!
-
-    
-#     """
-#     d = dict(**d)
-#     keys = list(d.keys())
-#     for key in keys:
-#         d[f'{key}_bigger'] = d[key] * 10
-#     return d
 
 @numpy_conjure(collection)
 def spectral_magnitude(arr: np.ndarray):
@@ -33,24 +14,19 @@ def spectral_magnitude(arr: np.ndarray):
 
 
 if __name__ == '__main__':
-    # try:
-    #     make_bigger({'a': 10, 'b': 3})
-    #     make_bigger({'z': 11, 'b': 3})
+    a = np.random.normal(0, 1, 10)
+    b = np.random.normal(0, 1, (10, 10))
+    c = np.random.normal(0, 1, (10, 10, 10))
 
-    #     p = serve_conjure(make_bigger, port=9999, n_workers=2)
+    try:
+        spectral_magnitude(a)
+        spectral_magnitude(b)
+        spectral_magnitude(c)
 
-    #     def write():
-    #         for i in range(100):
-    #             make_bigger({ 'g': i })
-    #             sleep(1)
+        p = serve_conjure(spectral_magnitude, port=9999, n_workers=2)
 
-    #     t = threading.Thread(target=write, args=())
-    #     t.start()
-    #     t.join()
 
-    #     input('waiting...')
-    #     p.kill()
-    # finally:
-    #     make_bigger.storage.destroy()
-
-    pass
+        input('waiting...')
+        p.kill()
+    finally:
+        spectral_magnitude.storage.destroy()

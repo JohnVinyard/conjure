@@ -59,7 +59,7 @@ class Dashboard(object):
         with open(os.path.join(MODULE_DIR, 'dashboard.html'), 'r') as f:
 
             desc = map(lambda x: x.strip(),
-                       self.conjure.description.split('\n'))
+                       (self.conjure.description or '').split('\n'))
             desc = '\n'.join(desc)
 
             content = f.read()

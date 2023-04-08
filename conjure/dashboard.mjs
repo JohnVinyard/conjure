@@ -79,6 +79,28 @@ document.addEventListener(
       li.onclick = () => fetchData(key);
       keysList.appendChild(li);
     });
+
+    // https://numpy.org/devdocs/reference/generated/numpy.lib.format.html
+
+    // fetch data for the first key
+    fetch(`/results/${data[0]}`).then(async (resp) => {
+      const raw = await resp.arrayBuffer();
+      const headerAndData = raw.slice(8);
+
+      const headerLen = new Uint16Array(headerAndData.slice(0, 2)).at(0);
+      console.log("HEADER LENGTH", headerLen);
+
+      const arr = new Uint8Array(headerAndData.slice(2, 2 + headerLen));
+      const str = String.fromCharCode(...arr);
+
+      const dtypePattern = /('descr':\s+)'([^']+)'/;
+      const shapePattern = /('shape':\s+)(\([^/)]+\))/;
+
+
+      console.log("HEADER");
+      console.log(str);
+
+    });
   },
   false
 );
