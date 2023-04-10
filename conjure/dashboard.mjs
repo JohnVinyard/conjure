@@ -47,7 +47,7 @@ const dtypeToConstructor = (dtype) => {
 };
 
 const renderCubeVisitor = (value, location) => {
-  const [loc] = location;
+  const [x, y, z] = location;
 
   const size = 0.5;
 
@@ -56,17 +56,36 @@ const renderCubeVisitor = (value, location) => {
   const geometry = new THREE.BoxGeometry(size, size, size);
   const material = new THREE.MeshBasicMaterial({
     color,
-    opacity: 0.1,
   });
   const cube = new THREE.Mesh(geometry, material);
   scene.add(cube);
-  cube.position.x = loc * size;
+  cube.position.x = (x || 0) * size;
+  cube.position.y = (y || 0) * size;
+  cube.position.z = (z || 0) * size;
+};
+
+const product = (arr) => {
+  if (arr.length === 0) {
+    return 1;
+  }
+  return arr.reduce((accum, current) => accum * current, 1);
+};
+
+const strides = (shape) => {
+  return shape.map((x, index, arr) => product(arr.slice(index + 1)));
+};
+
+const computeIndices = (flatIndex, shape, stride) => {
+  return shape.map((sh, index) => {
+    return Math.floor(flatIndex / stride[index]) % sh;
+  });
 };
 
 const visit = (typedArray, shape, visitor) => {
+  const stride = strides(shape);
+
   for (let i = 0; i < typedArray.length; i++) {
-    // TODO: get "shaped" location in array
-    const location = [i];
+    const location = computeIndices(i, shape, stride);
     visitor(typedArray.at(i), location);
   }
 };
@@ -75,31 +94,6 @@ document.addEventListener(
   "DOMContentLoaded",
   async () => {
     console.log("READY");
-
-    let offset = "";
-
-    // setInterval(() => {
-    //   console.log(`fetching with timestamp ${offset}`);
-    //   fetch(
-    //     "/feed?" +
-    //       new URLSearchParams({
-    //         offset,
-    //       })
-    //   ).then(async (resp) => {
-    //     const data = await resp.json();
-    //     const list = document.getElementById("new");
-    //     data.forEach(({ key, timestamp }) => {
-    //       list.insertAdjacentHTML(
-    //         "afterbegin",
-    //         `<li><a target="_blank" href="/results/${key}">${key}</a></li>`
-    //       );
-    //     });
-    //     if (data.length > 0) {
-    //       offset = data.slice(-1)[0].timestamp;
-    //       console.log(`Updated timestamp to be ${offset}`);
-    //     }
-    //   });
-    // }, 2500);
 
     // list the keys
     const results = await fetch("/");
@@ -135,16 +129,11 @@ document.addEventListener(
       const hasTrailingComma = rawShape.slice(-2)[0] === ",";
       const truncated = rawShape.slice(1, hasTrailingComma ? -2 : -1);
       const massagedShape = `[${truncated}]`;
-      console.log(rawShape);
-      console.log(massagedShape);
 
       const shape = JSON.parse(massagedShape);
       const arrayData = new (dtypeToConstructor(dtype))(
         headerAndData.slice(2 + headerLen)
       );
-
-      console.log(shape);
-      console.log("ARRAY ELEMENTS", arrayData.length);
 
       visit(arrayData, shape, renderCubeVisitor);
     });
