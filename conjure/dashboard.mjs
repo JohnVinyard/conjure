@@ -90,6 +90,53 @@ const visit = (typedArray, shape, visitor) => {
   }
 };
 
+const fetchBinary = (url) => {
+  return new Promise(function (resolve, reject) {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url);
+    xhr.responseType = "arraybuffer";
+    xhr.onload = function () {
+      if (this.status >= 200 && this.status < 300) {
+        resolve(xhr.response);
+      } else {
+        reject(this.status, xhr.statusText);
+      }
+    };
+    xhr.onerror = function () {
+      reject(this.status, xhr.statusText);
+    };
+    xhr.send();
+  });
+};
+
+const audioCache = {};
+const context = new (window.AudioContext || window.webkitAudioContext)();
+
+const fetchAudio = (url, context) => {
+  const cached = audioCache[url];
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const audioBufferPromise = fetchBinary(url).then(function (data) {
+    // return new Promise(function (resolve, reject) {
+    //   context.decodeAudioData(data, (buffer) => resolve(buffer));
+    // });
+    return context.decodeAudioData(data);
+  });
+  audioCache[url] = audioBufferPromise;
+  return audioBufferPromise;
+};
+
+const playAudio = (url, context, start, duration) => {
+  fetchAudio(url, context).then((audioBuffer) => {
+    const source = context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(context.destination);
+    source.start(0, start, duration);
+  });
+};
+
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
@@ -107,36 +154,41 @@ document.addEventListener(
       keysList.appendChild(li);
     });
 
+    document.onclick = () => {
+      playAudio(`/results/${data[0]}`, context, 0, 10);
+    };
+
     // https://numpy.org/devdocs/reference/generated/numpy.lib.format.html
 
     // fetch data for the first key
-    fetch(`/results/${data[0]}`).then(async (resp) => {
-      const raw = await resp.arrayBuffer();
-      const headerAndData = raw.slice(8);
+    // fetch(`/results/${data[0]}`).then(async (resp) => {
+    //   const raw = await resp.arrayBuffer();
+    //   const headerAndData = raw.slice(8);
 
-      const headerLen = new Uint16Array(headerAndData.slice(0, 2)).at(0);
-      console.log("HEADER LENGTH", headerLen);
+    //   const headerLen = new Uint16Array(headerAndData.slice(0, 2)).at(0);
+    //   console.log("HEADER LENGTH", headerLen);
 
-      const arr = new Uint8Array(headerAndData.slice(2, 2 + headerLen));
-      const str = String.fromCharCode(...arr);
+    //   const arr = new Uint8Array(headerAndData.slice(2, 2 + headerLen));
+    //   const str = String.fromCharCode(...arr);
 
-      const dtypePattern = /('descr':\s+)'([^']+)'/;
-      const shapePattern = /('shape':\s+)(\([^/)]+\))/;
+    //   const dtypePattern = /('descr':\s+)'([^']+)'/;
+    //   const shapePattern = /('shape':\s+)(\([^/)]+\))/;
 
-      const dtype = str.match(dtypePattern)[2];
-      const rawShape = str.match(shapePattern)[2];
+    //   const dtype = str.match(dtypePattern)[2];
+    //   const rawShape = str.match(shapePattern)[2];
 
-      const hasTrailingComma = rawShape.slice(-2)[0] === ",";
-      const truncated = rawShape.slice(1, hasTrailingComma ? -2 : -1);
-      const massagedShape = `[${truncated}]`;
+    //   const hasTrailingComma = rawShape.slice(-2)[0] === ",";
+    //   const truncated = rawShape.slice(1, hasTrailingComma ? -2 : -1);
+    //   const massagedShape = `[${truncated}]`;
 
-      const shape = JSON.parse(massagedShape);
-      const arrayData = new (dtypeToConstructor(dtype))(
-        headerAndData.slice(2 + headerLen)
-      );
+    //   const shape = JSON.parse(massagedShape);
+    //   const arrayData = new (dtypeToConstructor(dtype))(
+    //     headerAndData.slice(2 + headerLen)
+    //   );
 
-      visit(arrayData, shape, renderCubeVisitor);
-    });
+    //   // render tensor
+    //   visit(arrayData, shape, renderCubeVisitor);
+    // });
   },
   false
 );

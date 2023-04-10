@@ -28,6 +28,27 @@ class Deserializer(object):
         raise NotImplementedError()
 
 
+class IdentitySerializer(Serializer):
+    def __init__(self):
+        super().__init__()
+    
+    def to_bytes(self, content: Any) -> bytes:
+        return content
+    
+    def write(self, content: Any, sink: BinaryIO) -> None:
+        sink.write(content)
+
+
+class IdentityDeserializer(Deserializer):
+    def __init__(self):
+        super().__init__()
+    
+    def from_bytes(self, encoded: bytes) -> Any:
+        return encoded
+    
+    def read(self, sink: BinaryIO) -> Any:
+        return sink.read()
+
 class PickleSerializer(Serializer):
     def __init__(self):
         super().__init__()

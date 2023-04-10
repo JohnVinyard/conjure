@@ -1,7 +1,7 @@
 import datetime
 from typing import Callable, Union
 from conjure.identifier import FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
-from conjure.serialize import Deserializer, JSONDeserializer, JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
+from conjure.serialize import Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
 from conjure.storage import Collection
 
 
@@ -65,10 +65,10 @@ class Conjure(object):
         self.deserializer = deserializer
 
         self.listeners = []
-    
+
     def feed(self, offset: Union[bytes, str]):
         return self.storage.feed(offset)
-    
+
     @property
     def name(self):
         return self.callable.__name__
@@ -189,6 +189,7 @@ def json_conjure(storage: Collection, tag_deserialized=False):
         deserializer=JSONDeserializer(tag_deserialized=tag_deserialized)
     )
 
+
 def numpy_conjure(storage: Collection):
 
     return conjure(
@@ -198,4 +199,16 @@ def numpy_conjure(storage: Collection):
         param_identifier=ParamsHash(),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer()
+    )
+
+
+def audio_conjure(storage: Collection):
+
+    return conjure(
+        content_type='audio/wav',
+        storage=storage,
+        func_identifier=FunctionContentIdentifier(),
+        param_identifier=ParamsHash(),
+        serializer=IdentitySerializer(),
+        deserializer=IdentityDeserializer()
     )
