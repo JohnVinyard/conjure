@@ -7,11 +7,11 @@ from conjure.storage import LmdbCollection
 collection = LmdbCollection('http_test')
 
 
-@numpy_conjure(collection)
-def spectral_magnitude(arr: np.ndarray):
-    spec = np.fft.rfft(arr, axis=-1, norm='ortho')
-    spec = np.abs(spec).astype(np.float32)
-    return spec
+# @numpy_conjure(collection)
+# def spectral_magnitude(arr: np.ndarray):
+#     spec = np.fft.rfft(arr, axis=-1, norm='ortho')
+#     spec = np.abs(spec).astype(np.float32)
+#     return spec
 
 
 @audio_conjure(collection)
@@ -41,21 +41,21 @@ def resample_audio(url):
 
 
 if __name__ == '__main__':
-    a = np.random.normal(0, 1, 10)
-    b = np.random.normal(0, 1, (10, 10))
-    c = np.random.normal(0, 1, (10, 10, 10))
+    # a = np.random.normal(0, 1, 10)
+    # b = np.random.normal(0, 1, (10, 10))
+    # c = np.random.normal(0, 1, (10, 10, 10))
 
-    # a = resample_audio('https://music-net.s3.amazonaws.com/1919')
+    a = resample_audio('https://music-net.s3.amazonaws.com/1919')
 
     try:
-        spectral_magnitude(a)
-        spectral_magnitude(b)
-        spectral_magnitude(c)
+        # spectral_magnitude(a)
+        # spectral_magnitude(b)
+        # spectral_magnitude(c)
 
-        p = serve_conjure(spectral_magnitude, port=9999, n_workers=2)
+        p = serve_conjure(resample_audio, port=9999, n_workers=2)
 
         input('waiting...')
         p.kill()
     finally:
-        spectral_magnitude.storage.destroy()
+        # resample_audio.storage.destroy()
         pass
