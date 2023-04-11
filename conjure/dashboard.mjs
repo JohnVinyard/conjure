@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "https://unpkg.com/three@0.139.2/examples/jsm/controls/OrbitControls.js";
-import * as d3 from "d3";
+import { select } from "d3-select";
+import { scaleLinear } from "d3-scale";
+import { axisBottom, axisLeft } from "d3-axis";
+import { line } from "d3-shape";
 
 const fetchAudio = (url, context) => {
   const cached = audioCache[url];
@@ -99,6 +102,46 @@ class TensorData {
 
   get totalSize() {
     return this.data.length;
+  }
+
+  get maxValue() {
+    let max = 0;
+
+    for (let i = 0; i < this.totalSize; i++) {
+      const v = this.data.at(i);
+      if (v > max) {
+        max = v;
+      }
+    }
+
+    return max;
+  }
+
+  get minValue() {
+    let min = Infinity;
+
+    for (let i = 0; i < this.totalSize; i++) {
+      const v = this.data.at(i);
+      if (v < min) {
+        min = v;
+      }
+    }
+
+    return min;
+  }
+
+  getChannelData(channel) {
+    const [channelStride, elementStride] = this.strides;
+    const output = [];
+
+    const start = channel * channelStride;
+    const channelSize = this.shape[1];
+    const end = start + channelSize;
+
+    for (let i = start; i < end; i += elementStride) {
+      output.push(this.data.at(i));
+    }
+    return output;
   }
 
   indices(flat) {
@@ -250,15 +293,63 @@ class SeriesView {
   }
 
   render() {
-    
+    const [nChannels, size] = this.tensor.shape;
+
+    // TODO: get these values from the element
+    const width = 500;
+    const height = 500;
+
+    this.element.innerHTML = "";
+
+    const svg = select("#display-div")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(50, 10)`);
+
+    // Add X axis
+    const x = scaleLinear().domain([0, size]).range([0, width]);
+
+    svg
+      .append("g")
+      .attr("transform", `translate(0, ${height})`)
+      .call(axisBottom(x));
+
+    // Add Y axis
+    const y = scaleLinear().domain([0, 1]).range([0, height]);
+
+    svg.append("g").call(axisLeft(y));
+
+    const colors = ["#afa", "#faa"];
+
+    // render lines for each "channel"
+    for (let i = 0; i < nChannels; i++) {
+      const data = this.tensor
+        .getChannelData(i)
+        .map((value, index) => ({ value, index }));
+
+      console.log("CHANNEL", i, data);
+
+      svg
+        .append("path")
+        .datum(data)
+        .attr("fill", "none")
+        .attr("stroke", colors[i])
+        .attr("stroke-width", 1.5)
+        .attr(
+          "d",
+          line()
+            .x((d) => d.index)
+            .y((d) => y(d.value))
+        );
+    }
   }
 }
 
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-    console.log("READY");
-
     // list the keys
     const results = await fetch("/");
     const data = await results.json();
@@ -269,7 +360,8 @@ document.addEventListener(
       li.innerText = key;
       li.onclick = async () => {
         // TensorView.renderURL(`/results/${key}`, "display-canvas");
-        AudioView.renderURL(`/results/${key}`, "display-canvas");
+        // AudioView.renderURL(`/results/${key}`, "display-canvas");
+        SeriesView.renderURL(`/results/${key}`, "display-div");
       };
       keysList.appendChild(li);
     });

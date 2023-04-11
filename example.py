@@ -1,8 +1,10 @@
 import numpy as np
 from conjure import serve_conjure
-from conjure.decorate import audio_conjure, numpy_conjure
+from conjure.decorate import audio_conjure, numpy_conjure, time_series_conjure
 from conjure.storage import LmdbCollection
-
+from random import random
+from time import sleep
+from threading import Thread
 
 collection = LmdbCollection('http_test')
 
@@ -14,50 +16,73 @@ collection = LmdbCollection('http_test')
 #     return spec
 
 
-@audio_conjure(collection)
-def resample_audio(url):
-    import requests
-    from io import BytesIO
-    import zounds
-    from librosa import resample
+# @audio_conjure(collection)
+# def resample_audio(url):
+#     import requests
+#     from io import BytesIO
+#     import zounds
+#     from librosa import resample
 
-    resp = requests.get(url)
-    bio = BytesIO(resp.content)
-    original_audio = zounds.AudioSamples.from_file(bio).mono
-    target_sr = zounds.SR11025()
-    samples = resample(
-        original_audio,
-        orig_sr=int(original_audio.samplerate),
-        target_sr=int(target_sr))
-    samples = zounds.AudioSamples(samples, target_sr)
+#     resp = requests.get(url)
+#     bio = BytesIO(resp.content)
+#     original_audio = zounds.AudioSamples.from_file(bio).mono
+#     target_sr = zounds.SR11025()
+#     samples = resample(
+#         original_audio,
+#         orig_sr=int(original_audio.samplerate),
+#         target_sr=int(target_sr))
+#     samples = zounds.AudioSamples(samples, target_sr)
 
-    n_samples = 2 ** 15
-    resampled = zounds.AudioSamples(samples[:n_samples], target_sr)
+#     n_samples = 2 ** 15
+#     resampled = zounds.AudioSamples(samples[:n_samples], target_sr)
 
-    output = BytesIO()
-    resampled.encode(output)
-    output.seek(0)
-    return output.read()
+#     output = BytesIO()
+#     resampled.encode(output)
+#     output.seek(0)
+#     return output.read()
+
+d = {
+    'values': np.random.uniform(0, 1, (2, 100)).astype(np.float32)
+}
 
 
-# TODO: conjure with static id that does not cache
+@time_series_conjure(collection, 'loss')
+def time_series():
+    d['values'] = np.concatenate(
+        [d['values'], np.random.uniform(0, 1, (2, 2)).astype(np.float32)], axis=-1)
+    return d['values']
+
+
+def add_values():
+    try:
+        while True:
+            sleep(1)
+            print('adding new value')
+            time_series()
+    except KeyboardInterrupt:
+        return
+
 
 if __name__ == '__main__':
     # a = np.random.normal(0, 1, 10)
     # b = np.random.normal(0, 1, (10, 10))
     # c = np.random.normal(0, 1, (10, 10, 10))
 
-    a = resample_audio('https://music-net.s3.amazonaws.com/1919')
+    # a = resample_audio('https://music-net.s3.amazonaws.com/1919')
+
+    time_series()
+    t = Thread(target=add_values)
+    t.start()
 
     try:
         # spectral_magnitude(a)
         # spectral_magnitude(b)
         # spectral_magnitude(c)
 
-        p = serve_conjure(resample_audio, port=9999, n_workers=2)
+        p = serve_conjure(time_series, port=9999, n_workers=2)
 
         input('waiting...')
         p.kill()
     finally:
-        # resample_audio.storage.destroy()
+        time_series.storage.destroy()
         pass

@@ -1,6 +1,9 @@
 {
   "imports": {
     "three": "https://unpkg.com/three@0.139.2/build/three.module.js",
-    "d3": "https://cdn.jsdelivr.net/npm/d3-selection@3/+esm"
+    "d3-select": "https://cdn.jsdelivr.net/npm/d3-selection@3/+esm",
+    "d3-scale": "https://cdn.jsdelivr.net/npm/d3-scale@3/+esm",
+    "d3-axis": "https://cdn.jsdelivr.net/npm/d3-axis@3/+esm",
+    "d3-shape": "https://cdn.jsdelivr.net/npm/d3-shape@3/+esm"
   }
 }

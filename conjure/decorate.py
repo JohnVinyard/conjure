@@ -1,7 +1,7 @@
 import datetime
 from typing import Callable, Union
 from conjure.identifier import \
-    FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
+    FunctionContentIdentifier, FunctionIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash, ParamsIdentifier
 from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
@@ -185,7 +185,8 @@ def conjure(
         param_identifier: ParamsIdentifier,
         serializer: Serializer,
         deserializer: Deserializer,
-        key_delimiter='_'):
+        key_delimiter='_',
+        prefer_cache=True):
 
     def deco(f: Callable):
         return Conjure(
@@ -196,7 +197,8 @@ def conjure(
             param_identifier=param_identifier,
             serializer=serializer,
             deserializer=deserializer,
-            key_delimiter=key_delimiter
+            key_delimiter=key_delimiter,
+            prefer_cache=prefer_cache
         )
 
     return deco
@@ -235,4 +237,17 @@ def audio_conjure(storage: Collection):
         param_identifier=ParamsHash(),
         serializer=IdentitySerializer(),
         deserializer=IdentityDeserializer()
+    )
+
+
+def time_series_conjure(storage: Collection, name: bytes):
+
+    return conjure(
+        content_type='application/octet-stream',
+        storage=storage,
+        func_identifier=LiteralFunctionIdentifier(name),
+        param_identifier=LiteralParamsIdentifier(name),
+        serializer=NumpySerializer(),
+        deserializer=NumpyDeserializer(),
+        prefer_cache=False
     )
