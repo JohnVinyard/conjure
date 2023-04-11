@@ -71,6 +71,7 @@ class DecorateTests(TestCase):
         self.assertListEqual([1, 1, 1], values)
 
     def test_can_serve(self):
+
         @json_conjure(self.db)
         def make_bigger(d: dict) -> dict:
             d = dict(**d)
@@ -83,18 +84,18 @@ class DecorateTests(TestCase):
         make_bigger({'z': 11, 'b': 3})
 
         self.process = serve_conjure(
-            make_bigger, port=9999, n_workers=1, revive=False)
+            [make_bigger], port=9999, n_workers=1, revive=False)
 
         def get_keys_over_http():
-            resp = requests.get('http://localhost:9999/', verify=False)
-            keys = resp.json()
+            resp = requests.get(f'http://localhost:9999/functions/{make_bigger.identifier}', verify=False)
+            keys = resp.json()['keys']
             self.assertEqual(2, len(keys))
 
         retry(get_keys_over_http)
 
         meta = make_bigger.meta({'a': 10, 'b': 3})
         resp = requests.get(
-            f'http://localhost:9999/results/{meta.key.decode()}')
+            f'http://localhost:9999/functions/{make_bigger.identifier}/{meta.key.decode()}', verify=False)
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.headers['content-type'])
         self.assertEqual(json.dumps(result), resp.content.decode())

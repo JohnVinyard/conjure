@@ -306,7 +306,7 @@ class SeriesView {
       .attr("width", width)
       .attr("height", height)
       .append("g")
-      .attr("transform", `translate(50, 10)`);
+      .attr("transform", `translate(50, -10)`);
 
     // Add X axis
     const x = scaleLinear().domain([0, size]).range([0, width]);
@@ -329,8 +329,6 @@ class SeriesView {
         .getChannelData(i)
         .map((value, index) => ({ value, index }));
 
-      console.log("CHANNEL", i, data);
-
       svg
         .append("path")
         .datum(data)
@@ -340,30 +338,42 @@ class SeriesView {
         .attr(
           "d",
           line()
-            .x((d) => d.index)
+            .x((d) => x(d.index))
             .y((d) => y(d.value))
         );
     }
   }
 }
 
+const attachDataList = (parentId, data, itemElementName, transform) => {
+  const parentElement = document.getElementById(parentId);
+  parentElement.innerHTML = "";
+  data.forEach((item) => {
+    const child = document.createElement(itemElementName);
+    const mutated = transform(item, child);
+    parentElement.appendChild(mutated);
+  });
+};
+
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-    // list the keys
-    const results = await fetch("/");
-    const data = await results.json();
-    const keysList = document.getElementById("keys");
-    keysList.innerHTML = "";
-    data.forEach((key) => {
-      const li = document.createElement("li");
-      li.innerText = key;
-      li.onclick = async () => {
-        // TensorView.renderURL(`/results/${key}`, "display-canvas");
-        // AudioView.renderURL(`/results/${key}`, "display-canvas");
-        SeriesView.renderURL(`/results/${key}`, "display-div");
-      };
-      keysList.appendChild(li);
+    // list the functions
+    const data = await fetch("/functions").then((resp) => resp.json());
+
+    attachDataList("functions", data, "li", (d, c) => {
+      c.innerText = d.name;
+      c.addEventListener("click", async () => {
+        const { keys } = await fetch(d.url).then((resp) => resp.json());
+        attachDataList("keys", keys, "li", (key, li) => {
+          li.innerText = key;
+          li.addEventListener("click", async () => {
+            console.log(key);
+          });
+          return li;
+        });
+      });
+      return c;
     });
   },
   false
