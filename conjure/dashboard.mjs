@@ -64,6 +64,30 @@ const renderCubeVisitor = (value, location) => {
   cube.position.z = (z || 0) * size;
 };
 
+const AUDIO_STEP = 512;
+
+const renderAudioVisitor = (value, location) => {
+  const [x, y, z] = location;
+
+  if (x % AUDIO_STEP !== 0) {
+    return;
+  }
+
+  const size = 0.1;
+
+  const color = new THREE.Color(0.5, 0.5, 0.5);
+
+  const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
+  const material = new THREE.MeshBasicMaterial({
+    color,
+  });
+  const cube = new THREE.Mesh(geometry, material);
+  scene.add(cube);
+  cube.position.x = (x / AUDIO_STEP) * size;
+  cube.position.y = 0;
+  cube.position.z = 0;
+};
+
 const product = (arr) => {
   if (arr.length === 0) {
     return 1;
@@ -137,6 +161,26 @@ const playAudio = (url, context, start, duration) => {
   });
 };
 
+const draw1D = (stride, increment, height, imageData) => {
+  for (let i = 0; i < this.containerWidth(); i++) {
+    const index = this.featureData.length * this.offsetPercent + i * stride;
+    const sample = Math.abs(this.featureData.binaryData[Math.round(index)]);
+
+    // KLUDGE: This assumes that all data will be in range 0-1
+    const value = 0.25 + sample;
+    const color = `rgba(0, 0, 0, ${value})`;
+    this.drawContext.fillStyle = color;
+
+    const size = sample * height;
+    this.drawContext.fillRect(
+      this.$refs.container.scrollLeft + i,
+      (height - size) / 2,
+      increment,
+      size
+    );
+  }
+};
+
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
@@ -154,9 +198,14 @@ document.addEventListener(
       keysList.appendChild(li);
     });
 
-    document.onclick = () => {
-      playAudio(`/results/${data[0]}`, context, 0, 10);
-    };
+    // document.onclick = () => {
+    //   playAudio(`/results/${data[0]}`, context, 0, 10);
+    // };
+
+    fetchAudio(`/results/${data[0]}`, context).then((buffer) => {
+      const array = buffer.getChannelData(0);
+      visit(array, [array.length], renderAudioVisitor);
+    });
 
     // https://numpy.org/devdocs/reference/generated/numpy.lib.format.html
 
