@@ -155,26 +155,14 @@ class Conjure(object):
     def __call__(self, *args, **kwargs):
         key = self.key(*args, **kwargs)
 
-        if self.prefer_cache:
-            try:
-                raw = self.storage[key]
-                obj = self.deserializer.from_bytes(raw)
-                return obj
-            except KeyError:
-                # obj = self.callable(*args, **kwargs)
-                # raw = self.serializer.to_bytes(obj)
-                # self.storage[key] = raw
-                # for listener in self.listeners:
-                #     listener(WriteNotification(key))
-                # return obj
-                return self._compute_and_store(key, *args, **kwargs)
-        else:
-            # obj = self.callable(*args, **kwargs)
-            # raw = self.serializer.to_bytes(obj)
-            # self.storage[key] = raw
-            # for listener in self.listeners:
-            #     listener(WriteNotification(key))
-            # return obj
+        if not self.prefer_cache:
+            return self._compute_and_store(key, *args, **kwargs)
+
+        try:
+            raw = self.storage[key]
+            obj = self.deserializer.from_bytes(raw)
+            return obj
+        except KeyError:
             return self._compute_and_store(key, *args, **kwargs)
 
 
@@ -245,7 +233,7 @@ def time_series_conjure(storage: Collection, name: bytes):
     return conjure(
         content_type='application/octet-stream',
         storage=storage,
-        func_identifier=LiteralFunctionIdentifier(name),
+        func_identifier=FunctionContentIdentifier(),
         param_identifier=LiteralParamsIdentifier(name),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),
