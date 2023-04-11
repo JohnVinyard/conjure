@@ -1,5 +1,6 @@
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.139.2/build/three.module.js"
+    "three": "https://unpkg.com/three@0.139.2/build/three.module.js",
+    "d3": "https://cdn.jsdelivr.net/npm/d3-selection@3/+esm"
   }
 }

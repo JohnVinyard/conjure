@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "https://unpkg.com/three@0.139.2/examples/jsm/controls/OrbitControls.js";
+import * as d3 from "d3";
+
+console.log(d3);
 
 const myCanvas = document.getElementById("display-canvas");
 
