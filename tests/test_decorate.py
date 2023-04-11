@@ -4,10 +4,13 @@ from time import sleep
 from typing import Union
 from unittest import TestCase, skip
 import requests
+from random import random
 
 from traitlets import Callable
 
-from conjure.decorate import WriteNotification, json_conjure
+from conjure.decorate import Conjure, WriteNotification, json_conjure
+from conjure.identifier import LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
+from conjure.serialize import JSONDeserializer, JSONSerializer
 from conjure.serve import serve_conjure
 from conjure.storage import LmdbCollection
 from uuid import uuid4 as v4
@@ -41,6 +44,32 @@ class DecorateTests(TestCase):
             self.process.join(5)
             self.process.terminate()
 
+    def test_can_force_recompute(self):
+
+        loss_values = []
+
+        def func(new_value):
+            loss_values.append(new_value)
+            return loss_values
+
+        conj = Conjure(
+            func,
+            'application/json',
+            self.db,
+            LiteralFunctionIdentifier('loss'),
+            LiteralParamsIdentifier('loss_params'),
+            JSONSerializer(),
+            JSONDeserializer(),
+            key_delimiter='_',
+            prefer_cache=False)
+
+        values = conj(1)
+        values = conj(1)
+        values = conj(1)
+
+        self.assertEqual(3, len(values))
+        self.assertListEqual([1, 1, 1], values)
+
     def test_can_serve(self):
         @json_conjure(self.db)
         def make_bigger(d: dict) -> dict:
@@ -64,7 +93,8 @@ class DecorateTests(TestCase):
         retry(get_keys_over_http)
 
         meta = make_bigger.meta({'a': 10, 'b': 3})
-        resp = requests.get(f'http://localhost:9999/results/{meta.key.decode()}')
+        resp = requests.get(
+            f'http://localhost:9999/results/{meta.key.decode()}')
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.headers['content-type'])
         self.assertEqual(json.dumps(result), resp.content.decode())

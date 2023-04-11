@@ -7,7 +7,7 @@ import dill as pickle
 class FunctionIdentifier(object):
     def __init__(self):
         super().__init__()
-    
+
     def derive_name(self, fn: Callable) -> bytes:
         raise NotImplementedError()
 
@@ -16,7 +16,7 @@ class LiteralFunctionIdentifier(FunctionIdentifier):
     def __init__(self, name):
         super().__init__()
         self.name = name
-    
+
     def derive_name(self, fn: Callable) -> bytes:
         return self.name
 
@@ -24,16 +24,14 @@ class LiteralFunctionIdentifier(FunctionIdentifier):
 class FunctionNameIdentifier(FunctionIdentifier):
     def __init__(self):
         super().__init__()
-    
+
     def derive_name(self, fn: Callable) -> bytes:
         return fn.__name__
-
 
 
 class FunctionContentIdentifier(FunctionIdentifier):
     def __init__(self):
         super().__init__()
-    
 
     def _hash_function(self, f):
         h = sha1()
@@ -50,25 +48,32 @@ class FunctionContentIdentifier(FunctionIdentifier):
         value = h.hexdigest()
         return value
 
-    
     def derive_name(self, fn: Callable) -> bytes:
         return self._hash_function(fn)
-
-
 
 
 class ParamsIdentifier(object):
     def __init__(self):
         super().__init__()
-    
+
     def derive_name(self, *args, **kwargs) -> bytes:
         pass
+
+
+class LiteralParamsIdentifier(object):
+
+    def __init__(self, name: bytes):
+        super().__init__()
+        self.name = name
+
+    def derive_name(self, *args, **kwargs) -> bytes:
+        return self.name
 
 
 class ParamsHash(ParamsIdentifier):
     def __init__(self):
         super().__init__()
-    
+
     def _hash_args(self, *args, **kwargs):
         args_hash = sha1()
         args_hash.update(pickle.dumps(args))
@@ -83,9 +88,10 @@ class ParamsHash(ParamsIdentifier):
 class ParamsJSON(ParamsIdentifier):
     def __init__(self):
         super().__init__()
-    
+
     def derive_name(self, *args, **kwargs) -> bytes:
         if len(args):
-            raise ValueError('ParamsJSONSerializer does not support non-keyword arguments')
-        
+            raise ValueError(
+                'ParamsJSONSerializer does not support non-keyword arguments')
+
         return json.dumps(kwargs)

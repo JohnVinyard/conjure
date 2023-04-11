@@ -40,6 +40,8 @@ def resample_audio(url):
     return output.read()
 
 
+# TODO: conjure with static id that does not cache
+
 if __name__ == '__main__':
     # a = np.random.normal(0, 1, 10)
     # b = np.random.normal(0, 1, (10, 10))

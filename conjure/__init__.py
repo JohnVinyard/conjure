@@ -4,7 +4,7 @@ from .serialize import \
     IdentityDeserializer, IdentitySerializer
 from .identifier import \
     FunctionContentIdentifier, FunctionNameIdentifier, ParamsHash, \
-    ParamsIdentifier, ParamsJSON, LiteralFunctionIdentifier
+    ParamsIdentifier, ParamsJSON, LiteralFunctionIdentifier, LiteralParamsIdentifier
 from .storage import LocalCollectionWithBackup, LmdbCollection, S3Collection
 from .decorate import \
     Conjure, conjure, json_conjure, numpy_conjure, audio_conjure, MetaData, WriteNotification

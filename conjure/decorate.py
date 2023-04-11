@@ -1,7 +1,10 @@
 import datetime
 from typing import Callable, Union
-from conjure.identifier import FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
-from conjure.serialize import Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
+from conjure.identifier import \
+    FunctionContentIdentifier, FunctionIdentifier, ParamsHash, ParamsIdentifier
+from conjure.serialize import \
+    Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
+    JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
 from conjure.storage import Collection
 
 
@@ -52,7 +55,8 @@ class Conjure(object):
             param_identifier: ParamsIdentifier,
             serializer: Serializer,
             deserializer: Deserializer,
-            key_delimiter='_'):
+            key_delimiter='_',
+            prefer_cache=True):
 
         super().__init__()
         self.callable = callable
@@ -63,6 +67,7 @@ class Conjure(object):
         self.param_identifier = param_identifier
         self.serializer = serializer
         self.deserializer = deserializer
+        self.prefer_cache = prefer_cache
 
         self.listeners = []
 
@@ -139,19 +144,38 @@ class Conjure(object):
             )
         )
 
+    def _compute_and_store(self, key, *args, **kwargs):
+        obj = self.callable(*args, **kwargs)
+        raw = self.serializer.to_bytes(obj)
+        self.storage[key] = raw
+        for listener in self.listeners:
+            listener(WriteNotification(key))
+        return obj
+
     def __call__(self, *args, **kwargs):
         key = self.key(*args, **kwargs)
-        try:
-            raw = self.storage[key]
-            obj = self.deserializer.from_bytes(raw)
-            return obj
-        except KeyError:
-            obj = self.callable(*args, **kwargs)
-            raw = self.serializer.to_bytes(obj)
-            self.storage[key] = raw
-            for listener in self.listeners:
-                listener(WriteNotification(key))
-            return obj
+
+        if self.prefer_cache:
+            try:
+                raw = self.storage[key]
+                obj = self.deserializer.from_bytes(raw)
+                return obj
+            except KeyError:
+                # obj = self.callable(*args, **kwargs)
+                # raw = self.serializer.to_bytes(obj)
+                # self.storage[key] = raw
+                # for listener in self.listeners:
+                #     listener(WriteNotification(key))
+                # return obj
+                return self._compute_and_store(key, *args, **kwargs)
+        else:
+            # obj = self.callable(*args, **kwargs)
+            # raw = self.serializer.to_bytes(obj)
+            # self.storage[key] = raw
+            # for listener in self.listeners:
+            #     listener(WriteNotification(key))
+            # return obj
+            return self._compute_and_store(key, *args, **kwargs)
 
 
 def conjure(

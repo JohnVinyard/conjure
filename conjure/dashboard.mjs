@@ -89,6 +89,7 @@ const setupScene = (myCanvas) => {
   return scene;
 };
 
+// TODO: iterate over a specific "channel"
 class TensorData {
   constructor(data, shape) {
     this.data = data;
@@ -229,6 +230,27 @@ class TensorView {
   render() {
     const scene = setupScene(this.element);
     this.tensor.visit(renderCubeVisitor, scene);
+  }
+}
+
+class SeriesView {
+  constructor(elementId, tensor) {
+    this.elementId = elementId;
+    this.tensor = tensor;
+  }
+
+  static async renderURL(url, elementId) {
+    const data = await TensorData.fromURL(url);
+    const view = new SeriesView(elementId, data);
+    view.render();
+  }
+
+  get element() {
+    return document.getElementById(this.elementId);
+  }
+
+  render() {
+    
   }
 }
 
