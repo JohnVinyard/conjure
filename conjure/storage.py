@@ -240,7 +240,6 @@ class LmdbCollection(Collection):
             base_key = self.extract_base_key(key)
             feed_key = ensure_bytes(f'{base_key.decode()}_{timestamp.decode()}')
 
-            print('WRITING FEED:', feed_key)
             txn.put(feed_key, key, db=self._feed)
 
     def __getitem__(self, key):

@@ -54,11 +54,12 @@ def time_series():
 
 
 def add_values():
-    try:
-        time_series()
-        sleep(5)
-    except KeyboardInterrupt:
-        return
+    while True:
+        try:
+            time_series()
+            sleep(5)
+        except KeyboardInterrupt:
+            return
 
 
 if __name__ == '__main__':
