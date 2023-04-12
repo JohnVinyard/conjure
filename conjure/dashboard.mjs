@@ -358,17 +358,21 @@ const conjure = async ({
   element = null,
   metaData = null,
   style = { width: 500, height: 500 },
+  refreshRate = null,
+  feedOffset = null,
 } = {}) => {
   if (element === null) {
     await Promise.allSettled(
       Array.from(document.querySelectorAll("[data-conjure]")).map((element) =>
-        conjure({ element })
+        conjure({ element, style, refreshRate, feedOffset })
       )
     );
     return;
   }
 
-  const { key, public_uri, content_type } =
+  console.log(`Conjuring with feed offset ${feedOffset}`);
+
+  const { key, public_uri, content_type, feed_uri } =
     metaData === null
       ? JSON.parse(element.getAttribute("data-conjure"))
       : metaData;
@@ -397,6 +401,34 @@ const conjure = async ({
   root.appendChild(container);
 
   await renderer.renderURL(public_uri, container.id);
+
+  // TODO: If there's a refresh rate specified, periodically
+  // check the feed.  If there's an item with a timestamp larger
+  // than the one we've got, call conjure again with the same
+  // refresh rate and the new highest offset
+
+  if (refreshRate !== null && feed_uri) {
+    const interval = setInterval(async () => {
+      const searchParams = new URLSearchParams();
+
+      if (feedOffset) {
+        searchParams.append('offset', feedOffset);
+      }
+
+      const feed = await fetch(`${feed_uri}?${searchParams}`).then((resp) => resp.json());
+      const onlyNew = feed.filter((item) => item.timestamp !== feedOffset);
+      console.log(`Checked feed and found ${onlyNew.length} new items`);
+      if (onlyNew.length) {
+        clearInterval(interval);
+        await conjure({
+          element,
+          metaData,
+          refreshRate,
+          feedOffset: onlyNew.slice(-1)[0].timestamp,
+        });
+      }
+    }, refreshRate);
+  }
 };
 
 document.addEventListener(
@@ -404,8 +436,8 @@ document.addEventListener(
   async () => {
     // TODO: Only do this if we're on the dashboard
 
-    // TODO: create polling listeners for all feeds, and update display
-    // when new items become available
+    // TODO: Display the latest items from each function's feed,
+    // all at once
 
     // list the functions
     const data = await fetch("/functions").then((resp) => resp.json());
@@ -428,6 +460,7 @@ document.addEventListener(
             "data-conjure",
             JSON.stringify({
               key,
+              feed_uri: `/feed/${d.id}`,
               public_uri: `/functions/${d.id}/${key}`,
               content_type: d.content_type,
             })
@@ -436,7 +469,7 @@ document.addEventListener(
         });
 
         // hydrate all the conjure elements
-        await conjure();
+        await conjure({ refreshRate: 5000 });
       });
       return c;
     });
