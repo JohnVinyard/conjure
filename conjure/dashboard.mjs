@@ -358,13 +358,29 @@ const attachDataList = (parentId, data, itemElementName, transform) => {
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
+    // TODO: create polling listeners for all feeds, and update display
+    // when new items become available
+
     // list the functions
     const data = await fetch("/functions").then((resp) => resp.json());
 
     attachDataList("functions", data, "li", (d, c) => {
       c.innerText = d.name;
+
       c.addEventListener("click", async () => {
-        const { keys } = await fetch(d.url).then((resp) => resp.json());
+
+        // when a function is clicked, list its keys and its activity feed
+        const { keys, feed } = await fetch(d.url).then((resp) => resp.json());
+
+        const feedItems = await fetch(feed).then(resp => resp.json());
+
+        // display the feed
+        attachDataList("feed", feedItems, "li", ({ timestamp, key }, li) => {
+          li.innerText = `${timestamp} - ${key}`;
+          return li;
+        });
+
+        // display the keys
         attachDataList("keys", keys, "li", (key, li) => {
           li.innerText = key;
           li.addEventListener("click", async () => {

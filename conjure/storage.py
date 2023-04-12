@@ -1,4 +1,4 @@
-from typing import Iterable, Union
+from typing import Callable, Iterable, Union
 from urllib.parse import ParseResult, urlparse
 import lmdb
 import boto3
@@ -42,7 +42,7 @@ class Collection(object):
 
     def public_uri(self, key) -> ParseResult:
         raise NotImplementedError()
-    
+
     def feed(self, offset: Union[bytes, str] = None):
         raise NotImplementedError()
 
@@ -149,8 +149,11 @@ class S3Collection(Collection):
 
 
 class LmdbCollection(Collection):
-    def __init__(self, path):
+    def __init__(self, path, extract_base_key: Callable[[bytes], bytes] = None):
         super().__init__()
+
+        # KLUDGE: Delimiter is configurable elsewhere, so this might cause problems
+        self.extract_base_key = extract_base_key or (lambda x: ensure_bytes(ensure_str(x).split('_')[0]))
         self.path = path
         self.env = lmdb.open(
             self.path,
@@ -166,17 +169,19 @@ class LmdbCollection(Collection):
     def destroy(self):
         self.env.close()
         rmtree(self.path)
-    
 
     def feed(self, offset: Union[bytes, str] = None):
-        for i, key in enumerate(self.iter_prefix(offset, db=self._feed)):
-            if offset and i == 0:
-                continue
+        final_offset = offset or ''
+        prefix = self.extract_base_key(ensure_bytes(final_offset))
+
+        for i, key in enumerate(self.iter_prefix(final_offset, db=self._feed, prefix=prefix)):
+
             with self.env.begin(buffers=True, write=False, db=self._feed) as txn:
                 memoryview_value = txn.get(key)
                 value = bytes(memoryview_value)
-                # a tuple of (uuid v1, key)
-                yield { 'timestamp': key, 'key': value }
+                # a tuple of (time-based id, key)
+                output = {'timestamp': key, 'key': value}
+                yield output
 
     def content_length(self, key) -> int:
         with self.env.begin(buffers=True, write=False, db=self._data) as txn:
@@ -194,9 +199,9 @@ class LmdbCollection(Collection):
             return False
 
     def iter_prefix(
-            self, 
-            start_key: Union[str, bytes], 
-            prefix: Union[str, bytes, None]=None, 
+            self,
+            start_key: Union[str, bytes],
+            prefix: Union[str, bytes, None] = None,
             db=None):
 
         if db is None:
@@ -225,8 +230,18 @@ class LmdbCollection(Collection):
         with self.env.begin(write=True, buffers=True, db=self._data) as txn:
             key = ensure_bytes(key)
             txn.put(key, ensure_bytes(value))
+
+            # Problem: the storage layer knows nothing of how keys are constructed, but
+            # it needs to be able to construct a key like func_name_timestamp to keep the
+            # feed segregated
+            # Possible solutions
+            # conjure passes in a function for constructing feed ids
             timestamp = timestamp_id()
-            txn.put(timestamp, key, db=self._feed)
+            base_key = self.extract_base_key(key)
+            feed_key = ensure_bytes(f'{base_key.decode()}_{timestamp.decode()}')
+
+            print('WRITING FEED:', feed_key)
+            txn.put(feed_key, key, db=self._feed)
 
     def __getitem__(self, key):
         with self.env.begin(buffers=True, write=False, db=self._data) as txn:
@@ -258,7 +273,7 @@ class LocalCollectionWithBackup(Collection):
         else:
             self._remote = S3Collection(
                 remote_bucket, content_type, is_public=is_public)
-    
+
     def feed(self, offset: Union[bytes, str] = None):
         return self._local.feed(offset)
 

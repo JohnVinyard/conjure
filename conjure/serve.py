@@ -22,7 +22,8 @@ class ListFunctions(object):
                 'id': x.identifier,
                 'name': x.name,
                 'description': x.description or '',
-                'url': f'/functions/{x.identifier}'
+                'url': f'/functions/{x.identifier}',
+                'feed': f'/feed/{x.identifier}'
             }, self.functions.values()))
         res.status = falcon.HTTP_OK
 
@@ -40,6 +41,7 @@ class Function(object):
                 'name': func.name,
                 'description': func.description or '',
                 'url': f'/functions/{func.identifier}',
+                'feed': f'/feed/{func.identifier}',
                 'keys': list(k.decode() for k in func.iter_keys())
             }
         except KeyError:
@@ -72,7 +74,7 @@ class FunctionFeed(object):
         try:
             func = self.functions[identifier]
             offset = req.get_param('offset')
-            items = list(func.feed(offset))
+            items = list(func.feed(offset)) # [{ timestamp, key }]
             res.media = list(
                 map(lambda x: {key: value.decode() for key, value in x.items()}, items))
             res.status = falcon.HTTP_OK

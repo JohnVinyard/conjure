@@ -40,6 +40,7 @@ def resample_audio(url):
     output.seek(0)
     return output.read()
 
+
 d = {
     'values': np.random.uniform(0, 1, (2, 100)).astype(np.float32)
 }
@@ -52,12 +53,21 @@ def time_series():
     return d['values']
 
 
+def add_values():
+    try:
+        time_series()
+        sleep(5)
+    except KeyboardInterrupt:
+        return
 
 
 if __name__ == '__main__':
     a = np.random.normal(0, 1, 10)
     b = np.random.normal(0, 1, (10, 10))
     c = np.random.normal(0, 1, (10, 10, 10))
+
+    t = Thread(target=add_values)
+    t.start()
 
     audio = resample_audio('https://music-net.s3.amazonaws.com/1919')
 
@@ -73,8 +83,8 @@ if __name__ == '__main__':
                 resample_audio,
                 time_series,
                 spectral_magnitude
-            ], 
-            port=9999, 
+            ],
+            port=9999,
             n_workers=2)
 
         input('waiting...')

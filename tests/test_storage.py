@@ -140,15 +140,12 @@ class TestStorage(TestCase):
 
         read_keys = list(filter(lambda x: x in keys, self.db.iter_prefix('')))
 
-        print(read_keys)
-
         self.assertEqual(set(keys), set(read_keys))
 
     def test_correct_number_of_keys(self):
         n_keys = 20
 
         read_keys = list(self.db.iter_prefix(''))
-        print(read_keys)
         self.assertEqual(0, len(read_keys))
 
         keys = [v4().hex.encode() for _ in range(n_keys)]
@@ -165,15 +162,27 @@ class TestStorage(TestCase):
 
         feed_items = list(self.db.feed(offset=''))
         self.assertEqual(10, len(feed_items))
-
-    def test_feed_respects_offset(self):
+    
+    def test_feed_can_handle_offset_of_none(self):
         keys = [v4().hex.encode() for _ in range(10)]
         for key in keys:
             self.db[key] = key
 
-        feed_items = list(self.db.feed(offset=''))
+        feed_items = list(self.db.feed())
+        self.assertEqual(10, len(feed_items))
+    
 
-        middle = feed_items[4]['timestamp']
+    def test_feed_respects_offset(self):
+        base_key = v4().hex
+
+        keys = [f'{base_key}_{v4().hex}' for _ in range(10)]
+        for key in keys:
+            self.db[key] = key
+
+        feed_items = list(self.db.feed())
+        self.assertEqual(10, len(feed_items))
+
+        middle = feed_items[5]['timestamp']
         truncated_feed = list(self.db.feed(offset=middle))
 
         self.assertEqual(5, len(truncated_feed))

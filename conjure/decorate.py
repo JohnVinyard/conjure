@@ -1,7 +1,8 @@
 import datetime
 from typing import Callable, Union
 from conjure.identifier import \
-    FunctionContentIdentifier, FunctionIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash, ParamsIdentifier
+    FunctionContentIdentifier, FunctionIdentifier, LiteralFunctionIdentifier, \
+    LiteralParamsIdentifier, ParamsHash, ParamsIdentifier
 from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
@@ -71,8 +72,11 @@ class Conjure(object):
 
         self.listeners = []
 
-    def feed(self, offset: Union[bytes, str]):
-        return self.storage.feed(offset)
+    def feed(self, offset: Union[bytes, str] = None):
+        final_offset = offset or self.identifier
+        if not final_offset.startswith(self.identifier):
+            raise ValueError(f'offset must start with {self.identifier} but was {offset}')
+        return self.storage.feed(offset=final_offset)
 
     @property
     def name(self):
