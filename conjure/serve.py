@@ -23,6 +23,7 @@ class ListFunctions(object):
                 'name': x.name,
                 'description': x.description or '',
                 'content_type': x.content_type,
+                'code': x.code,
                 'url': f'/functions/{x.identifier}',
                 'feed': f'/feed/{x.identifier}'
             }, self.functions.values()))

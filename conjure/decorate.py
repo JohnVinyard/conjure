@@ -8,6 +8,7 @@ from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
 from conjure.storage import Collection
+import inspect
 
 
 class MetaData(object):
@@ -78,6 +79,10 @@ class Conjure(object):
         if not final_offset.startswith(self.identifier):
             raise ValueError(f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
+    
+    @property
+    def code(self):
+        return inspect.getsource(self.callable)
 
     @property
     def name(self):

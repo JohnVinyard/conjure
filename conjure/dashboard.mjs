@@ -412,10 +412,12 @@ const conjure = async ({
       const searchParams = new URLSearchParams();
 
       if (feedOffset) {
-        searchParams.append('offset', feedOffset);
+        searchParams.append("offset", feedOffset);
       }
 
-      const feed = await fetch(`${feed_uri}?${searchParams}`).then((resp) => resp.json());
+      const feed = await fetch(`${feed_uri}?${searchParams}`).then((resp) =>
+        resp.json()
+      );
       const onlyNew = feed.filter((item) => item.timestamp !== feedOffset);
       console.log(`Checked feed and found ${onlyNew.length} new items`);
       if (onlyNew.length) {
@@ -445,10 +447,17 @@ document.addEventListener(
     attachDataList("functions", data, "li", (d, c) => {
       c.innerText = `${d.name} - ${d.content_type}`;
 
+      const preElement = document.createElement("pre");
+      preElement.innerText = d.code;
+      c.appendChild(preElement);
+
       c.addEventListener("click", async () => {
         // first, clear the display
         const display = document.getElementById("display");
         display.innerHTML = "";
+
+        // TODO: Get the most recent key from the feed, only display
+        // that key, and set it to auto-refresh
 
         // when a function is clicked, list its keys
         const { keys } = await fetch(d.url).then((resp) => resp.json());
@@ -470,6 +479,7 @@ document.addEventListener(
 
         // hydrate all the conjure elements
         await conjure({ refreshRate: 5000 });
+
       });
       return c;
     });
