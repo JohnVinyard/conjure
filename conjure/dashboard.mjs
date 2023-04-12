@@ -5,6 +5,9 @@ import { scaleLinear } from "d3-scale";
 import { axisBottom, axisLeft } from "d3-axis";
 import { line } from "d3-shape";
 
+const audioCache = {};
+const context = new (window.AudioContext || window.webkitAudioContext)();
+
 const fetchAudio = (url, context) => {
   const cached = audioCache[url];
   if (cached !== undefined) {
@@ -92,7 +95,6 @@ const setupScene = (myCanvas) => {
   return scene;
 };
 
-// TODO: iterate over a specific "channel"
 class TensorData {
   constructor(data, shape) {
     this.data = data;
@@ -178,9 +180,6 @@ class TensorData {
     });
   }
 }
-
-const audioCache = {};
-const context = new (window.AudioContext || window.webkitAudioContext)();
 
 class AudioView {
   constructor(elementId, tensor, url) {
@@ -355,13 +354,25 @@ const attachDataList = (parentId, data, itemElementName, transform) => {
   });
 };
 
-/**
- *  Tensor = 'application/tensor+octet-stream'
-    TimeSeries = 'application/time-series+octet-stream'
-    Audio = 'audio/wav'
- */
+const conjure = async ({
+  element = null,
+  metaData = null,
+  style = { width: 500, height: 500 },
+} = {}) => {
+  if (element === null) {
+    await Promise.allSettled(
+      Array.from(document.querySelectorAll("[data-conjure]")).map((element) =>
+        conjure({ element })
+      )
+    );
+    return;
+  }
 
-const fetchAndRender = async ({ id, name, description, content_type }, key) => {
+  const { key, public_uri, content_type } =
+    metaData === null
+      ? JSON.parse(element.getAttribute("data-conjure"))
+      : metaData;
+
   const contentTypeToRenderClass = {
     "application/tensor+octet-stream": TensorView,
     "application/time-series+octet-stream": SeriesView,
@@ -377,24 +388,22 @@ const fetchAndRender = async ({ id, name, description, content_type }, key) => {
   const renderer = contentTypeToRenderClass[content_type];
   const rootElement = contentTypeToRootElementType[content_type];
 
-  const style = {
-    width: 500,
-    height: 500,
-  };
-
-  const root = document.getElementById("display");
+  const root = element;
   root.innerHTML = "";
 
   const container = document.createElement(rootElement);
   container.style = style;
-  container.id = `container-${Math.round(Math.random() * 1e6).toString(16)}`;
+  container.id = `display-${key}`;
   root.appendChild(container);
-  await renderer.renderURL(`/functions/${id}/${key}`, container.id);
+
+  await renderer.renderURL(public_uri, container.id);
 };
 
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
+    // TODO: Only do this if we're on the dashboard
+
     // TODO: create polling listeners for all feeds, and update display
     // when new items become available
 
@@ -405,28 +414,29 @@ document.addEventListener(
       c.innerText = `${d.name} - ${d.content_type}`;
 
       c.addEventListener("click", async () => {
-        const display = document.getElementById('display');
-        display.innerHTML = '';
-        
-        // when a function is clicked, list its keys and its activity feed
-        const { keys, feed } = await fetch(d.url).then((resp) => resp.json());
+        // first, clear the display
+        const display = document.getElementById("display");
+        display.innerHTML = "";
 
-        const feedItems = await fetch(feed).then((resp) => resp.json());
+        // when a function is clicked, list its keys
+        const { keys } = await fetch(d.url).then((resp) => resp.json());
 
-        // display the feed
-        attachDataList("feed", feedItems, "li", ({ timestamp, key }, li) => {
-          li.innerText = `${timestamp} - ${key}`;
-          return li;
+        // create elements for each of the keys
+        attachDataList("keys", keys, "div", (key, div) => {
+          div.id = `id-${key}`;
+          div.setAttribute(
+            "data-conjure",
+            JSON.stringify({
+              key,
+              public_uri: `/functions/${d.id}/${key}`,
+              content_type: d.content_type,
+            })
+          );
+          return div;
         });
 
-        // display the keys
-        attachDataList("keys", keys, "li", (key, li) => {
-          li.innerText = key;
-          li.addEventListener("click", async () => {
-            await fetchAndRender(d, key);
-          });
-          return li;
-        });
+        // hydrate all the conjure elements
+        await conjure();
       });
       return c;
     });
