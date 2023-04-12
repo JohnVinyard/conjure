@@ -230,16 +230,9 @@ class LmdbCollection(Collection):
         with self.env.begin(write=True, buffers=True, db=self._data) as txn:
             key = ensure_bytes(key)
             txn.put(key, ensure_bytes(value))
-
-            # Problem: the storage layer knows nothing of how keys are constructed, but
-            # it needs to be able to construct a key like func_name_timestamp to keep the
-            # feed segregated
-            # Possible solutions
-            # conjure passes in a function for constructing feed ids
             timestamp = timestamp_id()
             base_key = self.extract_base_key(key)
             feed_key = ensure_bytes(f'{base_key.decode()}_{timestamp.decode()}')
-
             txn.put(feed_key, key, db=self._feed)
 
     def __getitem__(self, key):

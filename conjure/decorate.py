@@ -1,5 +1,6 @@
 import datetime
 from typing import Callable, Union
+from conjure.contenttype import SupportedContentType
 from conjure.identifier import \
     FunctionContentIdentifier, FunctionIdentifier, LiteralFunctionIdentifier, \
     LiteralParamsIdentifier, ParamsHash, ParamsIdentifier
@@ -211,7 +212,7 @@ def json_conjure(storage: Collection, tag_deserialized=False):
 def numpy_conjure(storage: Collection):
 
     return conjure(
-        content_type='application/octet-stream',
+        content_type=SupportedContentType.Tensor.value,
         storage=storage,
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
@@ -223,7 +224,7 @@ def numpy_conjure(storage: Collection):
 def audio_conjure(storage: Collection):
 
     return conjure(
-        content_type='audio/wav',
+        content_type=SupportedContentType.Audio.value,
         storage=storage,
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
@@ -235,7 +236,7 @@ def audio_conjure(storage: Collection):
 def time_series_conjure(storage: Collection, name: bytes):
 
     return conjure(
-        content_type='application/octet-stream',
+        content_type=SupportedContentType.TimeSeries.value,
         storage=storage,
         func_identifier=FunctionContentIdentifier(),
         param_identifier=LiteralParamsIdentifier(name),

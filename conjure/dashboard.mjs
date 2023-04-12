@@ -301,7 +301,7 @@ class SeriesView {
 
     this.element.innerHTML = "";
 
-    const svg = select("#display-div")
+    const svg = select(`#${this.elementId}`)
       .append("svg")
       .attr("width", width)
       .attr("height", height)
@@ -355,6 +355,43 @@ const attachDataList = (parentId, data, itemElementName, transform) => {
   });
 };
 
+/**
+ *  Tensor = 'application/tensor+octet-stream'
+    TimeSeries = 'application/time-series+octet-stream'
+    Audio = 'audio/wav'
+ */
+
+const fetchAndRender = async ({ id, name, description, content_type }, key) => {
+  const contentTypeToRenderClass = {
+    "application/tensor+octet-stream": TensorView,
+    "application/time-series+octet-stream": SeriesView,
+    "audio/wav": AudioView,
+  };
+
+  const contentTypeToRootElementType = {
+    "application/tensor+octet-stream": "canvas",
+    "application/time-series+octet-stream": "div",
+    "audio/wav": "canvas",
+  };
+
+  const renderer = contentTypeToRenderClass[content_type];
+  const rootElement = contentTypeToRootElementType[content_type];
+
+  const style = {
+    width: 500,
+    height: 500,
+  };
+
+  const root = document.getElementById("display");
+  root.innerHTML = "";
+
+  const container = document.createElement(rootElement);
+  container.style = style;
+  container.id = `container-${Math.round(Math.random() * 1e6).toString(16)}`;
+  root.appendChild(container);
+  await renderer.renderURL(`/functions/${id}/${key}`, container.id);
+};
+
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
@@ -365,14 +402,16 @@ document.addEventListener(
     const data = await fetch("/functions").then((resp) => resp.json());
 
     attachDataList("functions", data, "li", (d, c) => {
-      c.innerText = d.name;
+      c.innerText = `${d.name} - ${d.content_type}`;
 
       c.addEventListener("click", async () => {
-
+        const display = document.getElementById('display');
+        display.innerHTML = '';
+        
         // when a function is clicked, list its keys and its activity feed
         const { keys, feed } = await fetch(d.url).then((resp) => resp.json());
 
-        const feedItems = await fetch(feed).then(resp => resp.json());
+        const feedItems = await fetch(feed).then((resp) => resp.json());
 
         // display the feed
         attachDataList("feed", feedItems, "li", ({ timestamp, key }, li) => {
@@ -384,7 +423,7 @@ document.addEventListener(
         attachDataList("keys", keys, "li", (key, li) => {
           li.innerText = key;
           li.addEventListener("click", async () => {
-            console.log(key);
+            await fetchAndRender(d, key);
           });
           return li;
         });
