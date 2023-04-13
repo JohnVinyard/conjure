@@ -1,3 +1,5 @@
+__version__ = '0.0.1'
+
 from .serialize import \
     Serializer, Deserializer, NumpySerializer, NumpyDeserializer, \
     JSONDeserializer, JSONSerializer, PickleDeserializer, PickleSerializer, \

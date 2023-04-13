@@ -1,12 +1,10 @@
 from typing import List
 import falcon
-from http import HTTPStatus
 from conjure.decorate import Conjure
 import multiprocessing
 import gunicorn.app.base
 import sys
 import os
-from markdown import markdown
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -148,8 +146,6 @@ def serve_conjure(
         port: int = 8888,
         n_workers: int = None,
         revive=True):
-
-    # app = Application(conjure)
 
     app = MutliFunctionApplication(conjure_funcs)
 
