@@ -1,9 +1,9 @@
-import * as THREE from "three";
+import * as THREE from "https://unpkg.com/three@0.139.2/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.139.2/examples/jsm/controls/OrbitControls.js";
-import { select } from "d3-select";
-import { scaleLinear } from "d3-scale";
-import { axisBottom, axisLeft } from "d3-axis";
-import { line } from "d3-shape";
+import { select } from "https://cdn.jsdelivr.net/npm/d3-selection@3/+esm";
+import { scaleLinear } from "https://cdn.jsdelivr.net/npm/d3-scale@3/+esm";
+import { axisBottom, axisLeft } from "https://cdn.jsdelivr.net/npm/d3-axis@3/+esm";
+import { line } from "https://cdn.jsdelivr.net/npm/d3-shape@3/+esm";
 
 const audioCache = {};
 const context = new (window.AudioContext || window.webkitAudioContext)();

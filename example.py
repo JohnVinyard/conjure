@@ -1,6 +1,6 @@
 import numpy as np
 from conjure import serve_conjure
-from conjure.decorate import audio_conjure, numpy_conjure, time_series_conjure
+from conjure.decorate import numpy_conjure, time_series_conjure
 from conjure.storage import LmdbCollection
 from time import sleep
 from threading import Thread
