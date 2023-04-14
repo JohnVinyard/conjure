@@ -47,6 +47,10 @@ const dtypeToConstructor = (dtype) => {
     return Float32Array;
   }
 
+  if (dtype === "<f8") {
+    return Float64Array;
+  }
+
   throw new Error("Not Implemented");
 };
 
@@ -383,12 +387,6 @@ const conjure = async (
       const el = elements[i];
       await conjure({ element: el, refreshRate, feedOffset });
     }
-
-    // await Promise.allSettled(
-    //   Array.from(.map((element) =>
-    //     conjure({ element, style, refreshRate, feedOffset })
-    //   )
-    // );
     return;
   }
 
