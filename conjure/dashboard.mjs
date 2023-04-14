@@ -207,7 +207,9 @@ class AudioView {
   }
 
   render() {
-    console.log(`Setting up scene with ${this.name} and ${this.element.id}`);
+    console.log(
+      `Setting up scene with ${AudioView.name} and ${this.element.id}`
+    );
     const scene = setupScene(this.element);
     this.tensor.visit(renderAudioVisitor, scene);
     this.element.removeEventListener("click", this.clickHandler);
@@ -274,7 +276,9 @@ class TensorView {
   }
 
   render() {
-    console.log(`Setting up scene with ${this.name} and ${this.element.id}`);
+    console.log(
+      `Setting up scene with ${TensorView.name} and ${this.element.id}`
+    );
     const scene = setupScene(this.element);
     this.tensor.visit(renderCubeVisitor, scene);
   }
@@ -297,7 +301,9 @@ class SeriesView {
   }
 
   render() {
-    console.log(`Setting up scene with ${this.name} and ${this.element.id}`);
+    console.log(
+      `Setting up scene with ${SeriesView.name} and ${this.element.id}`
+    );
     const [nChannels, size] = this.tensor.shape;
 
     // TODO: get these values from the element
@@ -372,11 +378,17 @@ const conjure = async (
   }
 ) => {
   if (element === null) {
-    await Promise.allSettled(
-      Array.from(document.querySelectorAll("[data-conjure]")).map((element) =>
-        conjure({ element, style, refreshRate, feedOffset })
-      )
-    );
+    const elements = document.querySelectorAll("[data-conjure]");
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      await conjure({ element: el, refreshRate, feedOffset });
+    }
+
+    // await Promise.allSettled(
+    //   Array.from(.map((element) =>
+    //     conjure({ element, style, refreshRate, feedOffset })
+    //   )
+    // );
     return;
   }
 
@@ -397,12 +409,12 @@ const conjure = async (
     "audio/wav": "canvas",
   };
 
-  console.log(
-    `conjuring with content-type: ${content_type}, class: ${contentTypeToRenderClass.name}, root element: ${contentTypeToRootElementType.name}`
-  );
-
   const renderer = contentTypeToRenderClass[content_type];
   const rootElement = contentTypeToRootElementType[content_type];
+
+  console.log(
+    `conjuring with content-type: ${content_type}, class: ${renderer.name}, root element: ${rootElement.name}`
+  );
 
   const root = element;
   root.innerHTML = "";
@@ -449,7 +461,6 @@ const conjure = async (
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-
     conjure();
     return;
 
