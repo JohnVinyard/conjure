@@ -357,13 +357,17 @@ const attachDataList = (parentId, data, itemElementName, transform) => {
   });
 };
 
-const conjure = async ({
-  element = null,
-  metaData = null,
-  style = { width: 500, height: 500 },
-  refreshRate = null,
-  feedOffset = null,
-} = {}) => {
+const conjure = async (
+  {
+    element = null,
+    metaData = null,
+    style = { width: "500px", height: "500px" },
+    refreshRate = null,
+    feedOffset = null,
+  } = {
+    style: { width: "500px", height: "500px" },
+  }
+) => {
   if (element === null) {
     await Promise.allSettled(
       Array.from(document.querySelectorAll("[data-conjure]")).map((element) =>
@@ -372,8 +376,6 @@ const conjure = async ({
     );
     return;
   }
-
-  console.log(`Conjuring with feed offset ${feedOffset}`);
 
   const { key, public_uri, content_type, feed_uri } =
     metaData === null
@@ -391,6 +393,10 @@ const conjure = async ({
     "application/time-series+octet-stream": "div",
     "audio/wav": "canvas",
   };
+
+  console.log(
+    `conjuring with content content type: ${content_type}, class: ${contentTypeToRenderClass}, root element: ${contentTypeToRootElementType}`
+  );
 
   const renderer = contentTypeToRenderClass[content_type];
   const rootElement = contentTypeToRootElementType[content_type];
@@ -439,11 +445,10 @@ const conjure = async ({
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-
     conjure();
     return;
 
-    // TODO: This is dumb.  This entire script should be separate, 
+    // TODO: This is dumb.  This entire script should be separate,
     // or even generated server-side
     if (!window.location.href.includes("dashboard")) {
       return;

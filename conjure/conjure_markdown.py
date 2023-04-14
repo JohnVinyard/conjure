@@ -99,12 +99,17 @@ def render_html(
 
         chunks = []
         for i, block in enumerate(code_blocks):
+            print('======================================')
+            
             chunks.append(content[current_pos:block.start])
             chunks.append(block.markdown)
             current_pos = block.end + 1
 
             print(f'Computing block {i}')
-            g, result = block.get_result(dict(**g))
+            try:
+                g, result = block.get_result(dict(**g))
+            except Exception as e:
+                print(f'Failed to compute block {i} with error {e}')
 
             if '_' in g:
                 try:
@@ -112,12 +117,17 @@ def render_html(
                     # TODO: only do this for jekyll?
                     chunks.append(f'{result.conjure_html()}')
                     print('rendered block as conjure')
+                    print(result.public_uri)
+                    print(result.content_type)
                 except AttributeError:
                     # render output as text
                     chunks.append(f'`{g["_"]}`')
                     print('rendered block as text')
-                
+
+            try:    
                 del g['_']
+            except KeyError:
+                pass
 
 
         chunks.append(content[current_pos:])
