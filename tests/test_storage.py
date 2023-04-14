@@ -14,7 +14,7 @@ class TestExploratory(TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.content_type = 'application/octet-stream'
+        cls.content_type = 'text/plain'
         cls.path = v4().hex
         cls.bucket_name = 'conjure-test'
         cls.db = LocalCollectionWithBackup(
@@ -69,7 +69,7 @@ class TestExploratory(TestCase):
 class TestStorage(TestCase):
 
     def setUp(self) -> None:
-        self.content_type = 'application/octet-stream'
+        self.content_type = 'application/text-plain'
         self.path = v4().hex
         self.backup_path = v4().hex
         self.backup = LmdbCollection(f'/tmp/{self.backup_path}')

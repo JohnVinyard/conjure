@@ -50,11 +50,13 @@ class Collection(object):
 # TODO: Create the bucket if it doesn't already exist and enable CORS
 class S3Collection(Collection):
 
-    def __init__(self, bucket, is_public=False):
+    def __init__(self, bucket, is_public=False, cors_enabled=False):
         super().__init__()
         self.bucket = bucket
         self.client = boto3.client('s3')
         self.is_public = is_public
+        self.cors_enabled = cors_enabled
+
         self._create_bucket()
 
     def public_uri(self, key: Union[bytes, str]):
@@ -97,6 +99,20 @@ class S3Collection(Collection):
                 Bucket=self.bucket)
         except self.client.exceptions.BucketAlreadyExists:
             pass
+
+        if self.cors_enabled:
+            self.client.put_bucket_cors(
+                Bucket=self.bucket,
+                CORSConfiguration={
+                    'CORSRules': [
+                        {
+                            'AllowedMethods': ['GET'],
+                            'AllowedOrigins': ['*'],
+                            'MaxAgeSeconds': 3000
+                        }
+                    ]
+                }
+            )
 
     def __contains__(self, key):
         try:
@@ -225,7 +241,6 @@ class LmdbCollection(Collection):
     def __delitem__(self, key: Union[str, bytes]):
         with self.env.begin(write=True, db=self._data) as txn:
             txn.delete(ensure_bytes(key))
-    
 
     def put(self, key: Union[str, bytes], value: Union[str, bytes], content_type: str):
         with self.env.begin(write=True, buffers=True, db=self._data) as txn:
@@ -236,7 +251,6 @@ class LmdbCollection(Collection):
             feed_key = ensure_bytes(
                 f'{base_key.decode()}_{timestamp.decode()}')
             txn.put(feed_key, key, db=self._feed)
-
 
     def __getitem__(self, key):
         with self.env.begin(buffers=True, write=False, db=self._data) as txn:
@@ -252,7 +266,8 @@ class LocalCollectionWithBackup(Collection):
             local_path,
             remote_bucket,
             is_public=False,
-            local_backup=False):
+            local_backup=False,
+            cors_enabled=False):
 
         super().__init__()
         self.local_backup = local_backup
@@ -265,7 +280,7 @@ class LocalCollectionWithBackup(Collection):
             self._remote = LmdbCollection(f'{local_path}_backup')
         else:
             self._remote = S3Collection(
-                remote_bucket, is_public=is_public)
+                remote_bucket, is_public=is_public, cors_enabled=cors_enabled)
 
     def feed(self, offset: Union[bytes, str] = None):
         return self._local.feed(offset)
@@ -318,8 +333,6 @@ class LocalCollectionWithBackup(Collection):
         self._local.put(key, resp, content_type=None)
         return resp
 
-
     def put(self, key: Union[str, bytes], value: Union[str, bytes], content_type: str):
         self._local.put(key, value, content_type)
         self._remote.put(key, value, content_type)
-

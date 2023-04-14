@@ -89,7 +89,8 @@ def render_html(
         storage = conjure.LocalCollectionWithBackup(
             local_path=storage_path,
             remote_bucket=s3_bucket,
-            is_public=True)
+            is_public=True,
+            cors_enabled=True)
 
         g = {'conjure_storage': storage}
         current_pos = 0
@@ -103,15 +104,16 @@ def render_html(
             print(f'Computing block {i}')
             g, result = block.get_result(dict(**g))
 
-            try:
-                chunks.append(result.conjure_html())
-            except AttributeError:
-                pass
-
-            try:
+            if '_' in g:
+                try:
+                    # render html that conjure will pick up and transform
+                    chunks.append(result.conjure_html())
+                except AttributeError:
+                    # render output as text
+                    chunks.append(f'<pre>{g["_"]}</pre>')
+                
                 del g['_']
-            except KeyError:
-                pass
+
 
         chunks.append(content[current_pos:])
 
