@@ -439,6 +439,10 @@ const conjure = async ({
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
+
+    conjure();
+    return;
+
     // TODO: This is dumb.  This entire script should be separate, 
     // or even generated server-side
     if (!window.location.href.includes("dashboard")) {
