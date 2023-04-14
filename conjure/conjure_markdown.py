@@ -127,7 +127,7 @@ def main():
         '--markdown',
         required=True,
         type=str,
-        help='Path to the mardown file used to generate output')
+        help='Path to the markdown file used to generate output')
     parser.add_argument(
         '--output',
         required=True,

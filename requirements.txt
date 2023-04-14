@@ -7,3 +7,4 @@ falcon
 gunicorn
 requests
 markdown
+inotify
