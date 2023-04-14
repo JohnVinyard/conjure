@@ -1,6 +1,7 @@
 import datetime
 import json
 from typing import Callable, Union
+from urllib.parse import ParseResult
 from conjure.contenttype import SupportedContentType
 from conjure.identifier import \
     FunctionContentIdentifier, FunctionIdentifier, LiteralFunctionIdentifier, \
@@ -10,10 +11,11 @@ from conjure.serialize import \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
 from conjure.storage import Collection, LocalCollectionWithBackup, ensure_str
 import inspect
+from urllib.parse import urlunparse
 
 
 class MetaData(object):
-    def __init__(self, key, public_uri, content_type, content_length):
+    def __init__(self, key, public_uri: ParseResult, content_type, content_length):
         super().__init__()
         self.key = key
         self.public_uri = public_uri
@@ -30,7 +32,7 @@ class MetaData(object):
     def conjure_html(self):
         conjure_data = {
             'key': ensure_str(self.key),
-            'public_uri': self.public_uri,
+            'public_uri': urlunparse(self.public_uri),
             'content_type': self.content_type,
             'feed_uri': f'/feed/{ensure_str(self.key)}'
         }
