@@ -405,7 +405,8 @@ const conjure = async (
   root.innerHTML = "";
 
   const container = document.createElement(rootElement);
-  container.style = style;
+  container.style.width = style.width;
+  container.style.height = style.height;
   container.id = `display-${key}`;
   root.appendChild(container);
 
