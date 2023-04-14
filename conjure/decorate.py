@@ -34,7 +34,7 @@ class MetaData(object):
             'content_type': self.content_type,
             'feed_uri': f'/feed/{ensure_str(self.key)}'
         }
-        return f'<section id="conjure-id-{ensure_str(self.key)}" data-conjure=\'{json.dumps(conjure_data)}\'></section>'
+        return f'<div id="conjure-id-{ensure_str(self.key)}" data-conjure=\'{json.dumps(conjure_data)}\'></div>'
 
 
 class ResultWithMetadata(object):
