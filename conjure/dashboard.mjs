@@ -207,6 +207,7 @@ class AudioView {
   }
 
   render() {
+    console.log(`Setting up scene with ${this.name} and ${this.element.id}`);
     const scene = setupScene(this.element);
     this.tensor.visit(renderAudioVisitor, scene);
     this.element.removeEventListener("click", this.clickHandler);
@@ -273,6 +274,7 @@ class TensorView {
   }
 
   render() {
+    console.log(`Setting up scene with ${this.name} and ${this.element.id}`);
     const scene = setupScene(this.element);
     this.tensor.visit(renderCubeVisitor, scene);
   }
@@ -295,6 +297,7 @@ class SeriesView {
   }
 
   render() {
+    console.log(`Setting up scene with ${this.name} and ${this.element.id}`);
     const [nChannels, size] = this.tensor.shape;
 
     // TODO: get these values from the element
@@ -347,15 +350,15 @@ class SeriesView {
   }
 }
 
-const attachDataList = (parentId, data, itemElementName, transform) => {
-  const parentElement = document.getElementById(parentId);
-  parentElement.innerHTML = "";
-  data.forEach((item) => {
-    const child = document.createElement(itemElementName);
-    const mutated = transform(item, child);
-    parentElement.appendChild(mutated);
-  });
-};
+// const attachDataList = (parentId, data, itemElementName, transform) => {
+//   const parentElement = document.getElementById(parentId);
+//   parentElement.innerHTML = "";
+//   data.forEach((item) => {
+//     const child = document.createElement(itemElementName);
+//     const mutated = transform(item, child);
+//     parentElement.appendChild(mutated);
+//   });
+// };
 
 const conjure = async (
   {
@@ -395,7 +398,7 @@ const conjure = async (
   };
 
   console.log(
-    `conjuring with content content type: ${content_type}, class: ${contentTypeToRenderClass}, root element: ${contentTypeToRootElementType}`
+    `conjuring with content-type: ${content_type}, class: ${contentTypeToRenderClass.name}, root element: ${contentTypeToRootElementType.name}`
   );
 
   const renderer = contentTypeToRenderClass[content_type];
@@ -446,59 +449,60 @@ const conjure = async (
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
+
     conjure();
     return;
 
     // TODO: This is dumb.  This entire script should be separate,
     // or even generated server-side
-    if (!window.location.href.includes("dashboard")) {
-      return;
-    }
+    // if (!window.location.href.includes("dashboard")) {
+    //   return;
+    // }
 
-    // TODO: Display the latest items from each function's feed,
-    // all at once
+    // // TODO: Display the latest items from each function's feed,
+    // // all at once
 
-    // list the functions
-    const data = await fetch("/functions").then((resp) => resp.json());
+    // // list the functions
+    // const data = await fetch("/functions").then((resp) => resp.json());
 
-    attachDataList("functions", data, "li", (d, c) => {
-      c.innerText = `${d.name} - ${d.content_type}`;
+    // attachDataList("functions", data, "li", (d, c) => {
+    //   c.innerText = `${d.name} - ${d.content_type}`;
 
-      const preElement = document.createElement("pre");
-      preElement.innerText = d.code;
-      c.appendChild(preElement);
+    //   const preElement = document.createElement("pre");
+    //   preElement.innerText = d.code;
+    //   c.appendChild(preElement);
 
-      c.addEventListener("click", async () => {
-        // first, clear the display
-        const display = document.getElementById("display");
-        display.innerHTML = "";
+    //   c.addEventListener("click", async () => {
+    //     // first, clear the display
+    //     const display = document.getElementById("display");
+    //     display.innerHTML = "";
 
-        // TODO: Get the most recent key from the feed, only display
-        // that key, and set it to auto-refresh
+    //     // TODO: Get the most recent key from the feed, only display
+    //     // that key, and set it to auto-refresh
 
-        // when a function is clicked, list its keys
-        const { keys } = await fetch(d.url).then((resp) => resp.json());
+    //     // when a function is clicked, list its keys
+    //     const { keys } = await fetch(d.url).then((resp) => resp.json());
 
-        // create elements for each of the keys
-        attachDataList("keys", keys, "div", (key, div) => {
-          div.id = `id-${key}`;
-          div.setAttribute(
-            "data-conjure",
-            JSON.stringify({
-              key,
-              feed_uri: `/feed/${d.id}`,
-              public_uri: `/functions/${d.id}/${key}`,
-              content_type: d.content_type,
-            })
-          );
-          return div;
-        });
+    //     // create elements for each of the keys
+    //     attachDataList("keys", keys, "div", (key, div) => {
+    //       div.id = `id-${key}`;
+    //       div.setAttribute(
+    //         "data-conjure",
+    //         JSON.stringify({
+    //           key,
+    //           feed_uri: `/feed/${d.id}`,
+    //           public_uri: `/functions/${d.id}/${key}`,
+    //           content_type: d.content_type,
+    //         })
+    //       );
+    //       return div;
+    //     });
 
-        // hydrate all the conjure elements
-        await conjure({ refreshRate: 5000 });
-      });
-      return c;
-    });
+    //     // hydrate all the conjure elements
+    //     await conjure({ refreshRate: 5000 });
+    //   });
+    //   return c;
+    // });
   },
   false
 );
