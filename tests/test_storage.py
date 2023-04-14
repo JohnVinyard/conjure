@@ -14,23 +14,19 @@ class TestExploratory(TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        cls.content_type = 'application/octet-stream'
         cls.path = v4().hex
         cls.bucket_name = 'conjure-test'
         cls.db = LocalCollectionWithBackup(
             f'/tmp/{cls.path}',
             remote_bucket=cls.bucket_name,
-            content_type='text/plain',
             is_public=True)
 
-    # @classmethod
-    # def tearDownClass(cls) -> None:
-    #     for key in cls.db.iter_prefix(start_key=''):
-    #         del cls.db[key]
 
     def test_supports_public_uri(self):
         key = v4().hex
         value = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         self.assertEqual(
             urlparse(f'https://conjure-test.s3.amazonaws.com/{key}'),
@@ -39,7 +35,7 @@ class TestExploratory(TestCase):
     def exists_after_write(self):
         key = v4().hex
         value = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         self.assertIn(key, self.db)
         self.assertIn(key, self.db._remote)
@@ -47,7 +43,7 @@ class TestExploratory(TestCase):
     def test_read_after_write(self):
         key = v4().hex
         value = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         read = self.db[key]
         self.assertEqual(read, value)
@@ -58,7 +54,7 @@ class TestExploratory(TestCase):
     def test_iter_keys(self):
         keys = [v4().hex.encode() for _ in range(10)]
         for key in keys:
-            self.db[key] = key
+            self.db.put(key, key, self.content_type)
 
         read_keys = list(filter(lambda x: x in keys, self.db.iter_prefix('')))
 
@@ -69,19 +65,17 @@ class TestExploratory(TestCase):
 
         self.assertEqual(set(backup_keys), set(read_keys))
 
-        # retry(check_backup_keys, max_tries=20, wait_time_seconds=2)
-
 
 class TestStorage(TestCase):
 
     def setUp(self) -> None:
+        self.content_type = 'application/octet-stream'
         self.path = v4().hex
         self.backup_path = v4().hex
         self.backup = LmdbCollection(f'/tmp/{self.backup_path}')
         self.db = LocalCollectionWithBackup(
             f'/tmp/{self.path}',
             remote_bucket=None,
-            content_type='text/plain',
             is_public=False,
             local_backup=self.backup)
 
@@ -91,14 +85,14 @@ class TestStorage(TestCase):
     def test_does_not_support_public_uri(self):
         key = b'key'
         value = b'value'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         self.assertRaises(NotImplementedError, lambda: self.db.public_uri(key))
 
     def test_writes_go_to_both_databases(self):
         key = b'key'
         value = b'value'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         self.assertIn(key, self.db._local)
         self.assertIn(key, self.backup)
@@ -106,7 +100,7 @@ class TestStorage(TestCase):
     def test_read_after_write(self):
         key = b'key'
         value = b'value'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         read = self.db[key]
         self.assertEqual(read, value)
@@ -114,7 +108,7 @@ class TestStorage(TestCase):
     def test_reads_from_backup(self):
         key = b'key'
         value = b'value'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         del self.db._local[key]
 
@@ -125,7 +119,7 @@ class TestStorage(TestCase):
     def test_writes_to_local_on_backup_read(self):
         key = b'key'
         value = b'value'
-        self.db[key] = value
+        self.db.put(key, value, self.content_type)
 
         del self.db._local[key]
 
@@ -136,7 +130,7 @@ class TestStorage(TestCase):
     def test_iter_keys(self):
         keys = [v4().hex.encode() for _ in range(10)]
         for key in keys:
-            self.db[key] = key
+            self.db.put(key, key, self.content_type)
 
         read_keys = list(filter(lambda x: x in keys, self.db.iter_prefix('')))
 
@@ -150,7 +144,7 @@ class TestStorage(TestCase):
 
         keys = [v4().hex.encode() for _ in range(n_keys)]
         for key in keys:
-            self.db[key] = key
+            self.db.put(key, key, self.content_type)
 
         read_keys = list(self.db.iter_prefix(''))
         self.assertEqual(n_keys, len(read_keys))
@@ -158,7 +152,7 @@ class TestStorage(TestCase):
     def test_feed_has_correct_number_of_items(self):
         keys = [v4().hex.encode() for _ in range(10)]
         for key in keys:
-            self.db[key] = key
+            self.db.put(key, key, self.content_type)
 
         feed_items = list(self.db.feed(offset=''))
         self.assertEqual(10, len(feed_items))
@@ -166,7 +160,7 @@ class TestStorage(TestCase):
     def test_feed_can_handle_offset_of_none(self):
         keys = [v4().hex.encode() for _ in range(10)]
         for key in keys:
-            self.db[key] = key
+            self.db.put(key, key, self.content_type)
 
         feed_items = list(self.db.feed())
         self.assertEqual(10, len(feed_items))
@@ -177,7 +171,7 @@ class TestStorage(TestCase):
 
         keys = [f'{base_key}_{v4().hex}' for _ in range(10)]
         for key in keys:
-            self.db[key] = key
+            self.db.put(key, key, self.content_type)
 
         feed_items = list(self.db.feed())
         self.assertEqual(10, len(feed_items))

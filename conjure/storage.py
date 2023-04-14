@@ -31,7 +31,7 @@ class Collection(object):
     def iter_prefix(self, start_key, prefix=None) -> Iterable[bytes]:
         raise NotImplementedError()
 
-    def __setitem__(self, key: bytes, value: bytes):
+    def put(self, key: bytes, value: bytes, content_type: str):
         raise NotImplementedError()
 
     def __getitem__(self, key) -> bytes:
@@ -50,11 +50,10 @@ class Collection(object):
 # TODO: Create the bucket if it doesn't already exist and enable CORS
 class S3Collection(Collection):
 
-    def __init__(self, bucket, content_type, is_public=False):
+    def __init__(self, bucket, is_public=False):
         super().__init__()
         self.bucket = bucket
         self.client = boto3.client('s3')
-        self.content_type = content_type
         self.is_public = is_public
         self._create_bucket()
 
@@ -131,12 +130,12 @@ class S3Collection(Collection):
             else:
                 break
 
-    def __setitem__(self, key: Union[bytes, str], value: bytes):
+    def put(self, key: Union[bytes, str], value: bytes, content_type: str):
         self.client.put_object(
             Bucket=self.bucket,
             Key=ensure_str(key),
             Body=value,
-            ContentType=self.content_type,
+            ContentType=content_type,
             ACL=self.acl)
 
     def __getitem__(self, key: Union[str, bytes]) -> bytes:
@@ -153,7 +152,8 @@ class LmdbCollection(Collection):
         super().__init__()
 
         # KLUDGE: Delimiter is configurable elsewhere, so this might cause problems
-        self.extract_base_key = extract_base_key or (lambda x: ensure_bytes(ensure_str(x).split('_')[0]))
+        self.extract_base_key = extract_base_key or (
+            lambda x: ensure_bytes(ensure_str(x).split('_')[0]))
         self.path = path
         self.env = lmdb.open(
             self.path,
@@ -225,15 +225,18 @@ class LmdbCollection(Collection):
     def __delitem__(self, key: Union[str, bytes]):
         with self.env.begin(write=True, db=self._data) as txn:
             txn.delete(ensure_bytes(key))
+    
 
-    def __setitem__(self, key: Union[str, bytes], value: Union[str, bytes]):
+    def put(self, key: Union[str, bytes], value: Union[str, bytes], content_type: str):
         with self.env.begin(write=True, buffers=True, db=self._data) as txn:
             key = ensure_bytes(key)
             txn.put(key, ensure_bytes(value))
             timestamp = timestamp_id()
             base_key = self.extract_base_key(key)
-            feed_key = ensure_bytes(f'{base_key.decode()}_{timestamp.decode()}')
+            feed_key = ensure_bytes(
+                f'{base_key.decode()}_{timestamp.decode()}')
             txn.put(feed_key, key, db=self._feed)
+
 
     def __getitem__(self, key):
         with self.env.begin(buffers=True, write=False, db=self._data) as txn:
@@ -248,12 +251,10 @@ class LocalCollectionWithBackup(Collection):
             self,
             local_path,
             remote_bucket,
-            content_type,
             is_public=False,
             local_backup=False):
 
         super().__init__()
-        self.content_type = content_type
         self.local_backup = local_backup
 
         self._local = LmdbCollection(local_path)
@@ -264,7 +265,7 @@ class LocalCollectionWithBackup(Collection):
             self._remote = LmdbCollection(f'{local_path}_backup')
         else:
             self._remote = S3Collection(
-                remote_bucket, content_type, is_public=is_public)
+                remote_bucket, is_public=is_public)
 
     def feed(self, offset: Union[bytes, str] = None):
         return self._local.feed(offset)
@@ -309,11 +310,16 @@ class LocalCollectionWithBackup(Collection):
         # then, try remote.  write to local
         # if the key is in the remote collection
         resp = self._remote[key]
-        self._local[key] = resp
+
+        # KLUDGE: This works, for now, but there should be
+        # another database mapping key -> content_type and
+        # a method for reading the value + metadata on the
+        # local storage instance
+        self._local.put(key, resp, content_type=None)
         return resp
 
-    def __setitem__(self, key: bytes, value: bytes):
-        # first set the key locally
-        self._local[key] = value
-        # then set it remotely
-        self._remote[key] = value
+
+    def put(self, key: Union[str, bytes], value: Union[str, bytes], content_type: str):
+        self._local.put(key, value, content_type)
+        self._remote.put(key, value, content_type)
+

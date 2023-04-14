@@ -1,4 +1,5 @@
 import datetime
+import json
 from typing import Callable, Union
 from conjure.contenttype import SupportedContentType
 from conjure.identifier import \
@@ -7,7 +8,7 @@ from conjure.identifier import \
 from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
-from conjure.storage import Collection
+from conjure.storage import Collection, LocalCollectionWithBackup
 import inspect
 
 
@@ -18,6 +19,22 @@ class MetaData(object):
         self.public_uri = public_uri
         self.content_type = content_type
         self.content_length = content_length
+    
+    def conjure_collection(self, local_path, remote_bucket, public=False):
+        return LocalCollectionWithBackup(
+            local_path=local_path,
+            remote_bucket=remote_bucket,
+            content_type=self.content_type,
+            is_public=public)
+
+    def conjure_html(self):
+        conjure_data = {
+            'key': self.key,
+            'public_uri': self.public_uri,
+            'content_type': self.content_type,
+            'feed_uri': f'/feed/{self.key}'
+        }
+        return f'<div id="conjure-id-{self.key}" data-conjure="{json.dumps(conjure_data)}"></div>'
 
 
 class ResultWithMetadata(object):
@@ -77,9 +94,10 @@ class Conjure(object):
     def feed(self, offset: Union[bytes, str] = None):
         final_offset = offset or self.identifier
         if not final_offset.startswith(self.identifier):
-            raise ValueError(f'offset must start with {self.identifier} but was {offset}')
+            raise ValueError(
+                f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
-    
+
     @property
     def code(self):
         return inspect.getsource(self.callable)
@@ -157,7 +175,7 @@ class Conjure(object):
     def _compute_and_store(self, key, *args, **kwargs):
         obj = self.callable(*args, **kwargs)
         raw = self.serializer.to_bytes(obj)
-        self.storage[key] = raw
+        self.storage.put(key, raw, self.content_type)
         for listener in self.listeners:
             listener(WriteNotification(key))
         return obj

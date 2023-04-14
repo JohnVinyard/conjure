@@ -2,7 +2,10 @@ import * as THREE from "https://unpkg.com/three@0.139.2/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.139.2/examples/jsm/controls/OrbitControls.js";
 import { select } from "https://cdn.jsdelivr.net/npm/d3-selection@3/+esm";
 import { scaleLinear } from "https://cdn.jsdelivr.net/npm/d3-scale@3/+esm";
-import { axisBottom, axisLeft } from "https://cdn.jsdelivr.net/npm/d3-axis@3/+esm";
+import {
+  axisBottom,
+  axisLeft,
+} from "https://cdn.jsdelivr.net/npm/d3-axis@3/+esm";
 import { line } from "https://cdn.jsdelivr.net/npm/d3-shape@3/+esm";
 
 const audioCache = {};
@@ -436,7 +439,11 @@ const conjure = async ({
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-    // TODO: Only do this if we're on the dashboard
+    // TODO: This is dumb.  This entire script should be separate, 
+    // or even generated server-side
+    if (!window.location.href.includes("dashboard")) {
+      return;
+    }
 
     // TODO: Display the latest items from each function's feed,
     // all at once
@@ -479,7 +486,6 @@ document.addEventListener(
 
         // hydrate all the conjure elements
         await conjure({ refreshRate: 5000 });
-
       });
       return c;
     });
