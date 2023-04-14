@@ -15,30 +15,30 @@ def spectral_magnitude(arr: np.ndarray):
     return spec
 
 
-@audio_conjure(collection)
-def resample_audio(url):
-    import requests
-    from io import BytesIO
-    import zounds
-    from librosa import resample
+# @audio_conjure(collection)
+# def resample_audio(url):
+#     import requests
+#     from io import BytesIO
+#     import zounds
+#     from librosa import resample
 
-    resp = requests.get(url)
-    bio = BytesIO(resp.content)
-    original_audio = zounds.AudioSamples.from_file(bio).mono
-    target_sr = zounds.SR11025()
-    samples = resample(
-        original_audio,
-        orig_sr=int(original_audio.samplerate),
-        target_sr=int(target_sr))
-    samples = zounds.AudioSamples(samples, target_sr)
+#     resp = requests.get(url)
+#     bio = BytesIO(resp.content)
+#     original_audio = zounds.AudioSamples.from_file(bio).mono
+#     target_sr = zounds.SR11025()
+#     samples = resample(
+#         original_audio,
+#         orig_sr=int(original_audio.samplerate),
+#         target_sr=int(target_sr))
+#     samples = zounds.AudioSamples(samples, target_sr)
 
-    n_samples = 2 ** 15
-    resampled = zounds.AudioSamples(samples[:n_samples], target_sr)
+#     n_samples = 2 ** 15
+#     resampled = zounds.AudioSamples(samples[:n_samples], target_sr)
 
-    output = BytesIO()
-    resampled.encode(output)
-    output.seek(0)
-    return output.read()
+#     output = BytesIO()
+#     resampled.encode(output)
+#     output.seek(0)
+#     return output.read()
 
 
 d = {
