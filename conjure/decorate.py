@@ -8,7 +8,7 @@ from conjure.identifier import \
 from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
-from conjure.storage import Collection, LocalCollectionWithBackup
+from conjure.storage import Collection, LocalCollectionWithBackup, ensure_str
 import inspect
 
 
@@ -29,12 +29,12 @@ class MetaData(object):
 
     def conjure_html(self):
         conjure_data = {
-            'key': self.key,
+            'key': ensure_str(self.key),
             'public_uri': self.public_uri,
             'content_type': self.content_type,
-            'feed_uri': f'/feed/{self.key}'
+            'feed_uri': f'/feed/{ensure_str(self.key)}'
         }
-        return f'<div id="conjure-id-{self.key}" data-conjure="{json.dumps(conjure_data)}"></div>'
+        return f'<section id="conjure-id-{ensure_str(self.key)}" data-conjure=\'{json.dumps(conjure_data)}\'></section>'
 
 
 class ResultWithMetadata(object):

@@ -81,6 +81,8 @@ def render_html(
 
         code_blocks = list(EmbeddedCodeBlock.extract_all(content))
 
+        print(f'found {len(code_blocks)} code blocks')
+
         if len(code_blocks) == 0:
             with open(output_path, 'w') as output_file:
                 output_file.write(content)
@@ -107,10 +109,13 @@ def render_html(
             if '_' in g:
                 try:
                     # render html that conjure will pick up and transform
-                    chunks.append(result.conjure_html())
+                    # TODO: only do this for jekyll?
+                    chunks.append(f'{result.conjure_html()}')
+                    print('rendered block as conjure')
                 except AttributeError:
                     # render output as text
-                    chunks.append(f'<pre>{g["_"]}</pre>')
+                    chunks.append(f'`{g["_"]}`')
+                    print('rendered block as text')
                 
                 del g['_']
 
@@ -159,7 +164,7 @@ def main():
         md_filename = os.path.basename(args.markdown)
         output_path = os.path.join(args.output, md_filename)
 
-    render_html(args.markdown, output_path, args.storage_path, args.s3)
+    render_html(args.markdown, output_path, args.storage, args.s3)
 
     if args.watch:
         import inotify.adapters
@@ -169,4 +174,4 @@ def main():
             (_, type_names, path, filename) = event
             if 'IN_CLOSE_WRITE' in type_names:
                 render_html(args.markdown, output_path,
-                            args.storage_path, args.s3)
+                            args.storage, args.s3)
