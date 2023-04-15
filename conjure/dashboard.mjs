@@ -410,35 +410,6 @@ class TensorView {
     // render the initial scene
     this.tensor.visit(visitor, world.scene);
 
-    // // set the update function on the world
-    // world.sceneUpdater = (elapsedTime) => {
-    //   if (this.playStartTime === null) {
-    //     // the audio isn't currently playing, so there's
-    //     // no need to animate anything
-    //     return;
-    //   }
-
-    //   const currentTime = elapsedTime - this.playStartTime;
-    //   const currentBlock = Math.round(
-    //     (currentTime * this.samplerate) / this.stepSize
-    //   );
-    //   // const cube = this.world.getObjectByName(currentBlock);
-
-    //   this.world.traverseChildren((child) => {
-    //     if (!child.material) {
-    //       return;
-    //     }
-
-    //     if (child.name !== currentBlock.toString()) {
-    //       child.scale.set(1, 1, 1);
-    //       child.material.color.setHex(0x666666);
-    //     } else {
-    //       child.scale.set(2, 1, 1);
-    //       child.material.color.setHex(0x999999);
-    //     }
-    //   });
-    // };
-
     world.start();
   }
 }
