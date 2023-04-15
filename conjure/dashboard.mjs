@@ -337,17 +337,17 @@ class AudioView {
       const currentBlock = Math.round((currentTime * this.samplerate) / 512);
       // const cube = this.world.getObjectByName(currentBlock);
 
-      
       this.world.traverseChildren((child) => {
-        console.log(child.name, currentBlock.toString(), child.name === currentBlock.toString())
+        if (!child.material) {
+          return;
+        }
+
         if (child.name !== currentBlock.toString()) {
-          // child.opacity = 0.5;
-          // child.setValues({ opacity: 0.5 })
+          child.scale.set(1, 1, 1);
+          child.material.color.setHex(0x666666);
         } else {
-          // console.log(`Updating ${child.name} at ${elapsedTime}`);
-          // child.opacity = 1.0;
-          child.rotateX(1);
-          // child.setValues({ opacity: 1 })
+          child.scale.set(2, 1, 1);
+          child.material.color.setHex(0x999999);
         }
       });
     };
@@ -370,12 +370,11 @@ const renderAudioVisitor = (value, location, scene) => {
 
   const size = 0.1;
 
-  const color = new THREE.Color(1, 1, 1);
+  const color = new THREE.Color(0x666666);
 
   const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
-  const material = new THREE.MeshToonMaterial({
+  const material = new THREE.MeshLambertMaterial({
     color,
-    opacity: 0.5,
   });
   const cube = new THREE.Mesh(geometry, material);
 
