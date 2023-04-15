@@ -24,22 +24,28 @@ const fetchAudio = (url, context) => {
   return audioBufferPromise;
 };
 
-const playAudio = (url, context, start, duration) => {
+const playAudio = (url, context, start, duration, onComplete) => {
   fetchAudio(url, context).then((audioBuffer) => {
     const source = context.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(context.destination);
     source.start(0, start, duration);
+    setTimeout(onComplete, (duration || audioBuffer.duration) * 1000);
   });
 };
 
 const visit = (typedArray, shape, visitor, scene) => {
   const stride = strides(shape);
 
+  const shapes = [];
+
   for (let i = 0; i < typedArray.length; i++) {
     const location = computeIndices(i, shape, stride);
-    visitor(typedArray.at(i), location, scene);
+    const shpe = visitor(typedArray.at(i), location, scene);
+    shapes.push(shpe);
   }
+
+  return shapes;
 };
 
 const dtypeToConstructor = (dtype) => {
@@ -71,42 +77,124 @@ const computeIndices = (flatIndex, shape, stride) => {
   });
 };
 
-const setupScene = (myCanvas) => {
-  const axes = new THREE.AxesHelper();
+class World {
+  constructor(myCanvas, cameraPosition) {
+    const axes = new THREE.AxesHelper();
 
-  const scene = new THREE.Scene();
-  scene.add(axes);
+    const scene = new THREE.Scene();
+    scene.add(axes);
 
-  const camera = new THREE.PerspectiveCamera(
-    50,
-    myCanvas.offsetWidth / myCanvas.offsetHeight
-  );
-  camera.position.set(10, 10, 10);
-  camera.lookAt(scene.position);
+    const camera = new THREE.PerspectiveCamera(
+      50,
+      myCanvas.offsetWidth / myCanvas.offsetHeight
+    );
+    camera.position.set(...cameraPosition);
+    camera.lookAt(scene.position);
 
-  const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
-  renderer.setClearColor(0xffffff, 1.0);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
+    const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
+    renderer.setClearColor(0x000, 1.0);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
 
-  const orbitControls = new OrbitControls(camera, renderer.domElement);
-  orbitControls.maxPolarAngle = Math.PI * 0.5;
-  orbitControls.minDistance = 0.1;
-  orbitControls.maxDistance = 100;
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.maxPolarAngle = Math.PI * 0.5;
+    orbitControls.minDistance = 0.1;
+    orbitControls.maxDistance = 100;
 
-  renderer.setAnimationLoop(() => {
-    orbitControls.update();
-    renderer.render(scene, camera);
-  });
+    const clock = new THREE.Clock(true);
 
-  return scene;
-};
+    const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+    scene.add(light);
+
+    this.scene = scene;
+    this.renderer = renderer;
+    this.clock = clock;
+    this.camera = camera;
+    this.orbitControls = orbitControls;
+
+    this.elapsedTime = 0;
+
+    this.sceneUpdater = null;
+  }
+
+  getObjectByName(name) {
+    return this.scene.getObjectByName(name);
+  }
+
+  traverseChildren(func) {
+    // this.scene.traverse(func);
+    this.scene.children.forEach(func);
+  }
+
+  start() {
+    this.renderer.setAnimationLoop(() => {
+      this.elapsedTime += this.clock.getDelta();
+
+      if (this.sceneUpdater !== null) {
+        this.sceneUpdater(this.elapsedTime);
+      }
+      // TODO: I need to be able to inject code here, and get
+      // the elapsed time passed in as a parameter
+      this.orbitControls.update();
+      this.renderer.render(this.scene, this.camera);
+    });
+  }
+
+  stop() {
+    throw new Error("Not Implemented");
+  }
+}
+
+// const setupScene = (myCanvas, cameraPosition = [10, 10, 10]) => {
+//   const axes = new THREE.AxesHelper();
+
+//   const scene = new THREE.Scene();
+//   scene.add(axes);
+
+//   const camera = new THREE.PerspectiveCamera(
+//     50,
+//     myCanvas.offsetWidth / myCanvas.offsetHeight
+//   );
+//   camera.position.set(...cameraPosition);
+//   camera.lookAt(scene.position);
+
+//   const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
+//   renderer.setClearColor(0x000, 1.0);
+//   renderer.setPixelRatio(window.devicePixelRatio);
+//   renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
+
+//   const orbitControls = new OrbitControls(camera, renderer.domElement);
+//   orbitControls.maxPolarAngle = Math.PI * 0.5;
+//   orbitControls.minDistance = 0.1;
+//   orbitControls.maxDistance = 100;
+
+//   const clock = new THREE.Clock(true);
+
+//   renderer.setAnimationLoop(() => {
+//     // TODO: I need to be able to inject code here, and get
+//     // the elapsed time passed in as a parameter
+//     orbitControls.update();
+//     renderer.render(scene, camera);
+//   });
+
+//   const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+//   scene.add(light);
+
+//   return scene;
+// };
 
 class TensorData {
-  constructor(data, shape) {
+  /**
+   *
+   * @param {TypedArray} data - flat, typed array
+   * @param {Array} shape  - the shape of the multidimensional array
+   * @param {Object} metadata - arbitrary key-value pairs for additional info
+   */
+  constructor(data, shape, metadata) {
     this.data = data;
     this.shape = shape;
     this.strides = strides(shape);
+    this.metadata = metadata;
   }
 
   get totalSize() {
@@ -158,7 +246,7 @@ class TensorData {
   }
 
   visit(visitor, scene) {
-    visit(this.data, this.shape, visitor, scene);
+    return visit(this.data, this.shape, visitor, scene);
   }
 
   static async fromNpy(raw) {
@@ -193,17 +281,32 @@ class AudioView {
     this.elementId = elementId;
     this.tensor = tensor;
     this.url = url;
+    this.playStartTime = null;
+    this.world = null;
+
     this.clickHandler = () => {
-      playAudio(url, context, 0);
+      this.playStartTime = this.world.elapsedTime;
+
+      playAudio(url, context, 0, undefined, () => {
+        // the audio is done playing;
+        this.playStartTime = null;
+      });
     };
   }
 
   static async renderURL(url, elementId) {
     const rawData = await fetchAudio(url, context);
+    const samplerate = rawData.sampleRate;
     const channelData = rawData.getChannelData(0);
-    const data = new TensorData(channelData, [channelData.length]);
+    const data = new TensorData(channelData, [channelData.length], {
+      samplerate,
+    });
     const view = new AudioView(elementId, data, url);
     view.render();
+  }
+
+  get samplerate() {
+    return this.tensor.metadata.samplerate;
   }
 
   get element() {
@@ -214,8 +317,43 @@ class AudioView {
     console.log(
       `Setting up scene with ${AudioView.name} and ${this.element.id}`
     );
-    const scene = setupScene(this.element);
-    this.tensor.visit(renderAudioVisitor, scene);
+
+    // set up the world and store a reference
+    const world = new World(this.element, [50, 0, 50]);
+    this.world = world;
+
+    // render the initial scene
+    this.tensor.visit(renderAudioVisitor, world.scene);
+
+    // set the update function on the world
+    world.sceneUpdater = (elapsedTime) => {
+      if (this.playStartTime === null) {
+        // the audio isn't currently playing, so there's
+        // no need to animate anything
+        return;
+      }
+
+      const currentTime = elapsedTime - this.playStartTime;
+      const currentBlock = Math.round((currentTime * this.samplerate) / 512);
+      // const cube = this.world.getObjectByName(currentBlock);
+
+      
+      this.world.traverseChildren((child) => {
+        console.log(child.name, currentBlock.toString(), child.name === currentBlock.toString())
+        if (child.name !== currentBlock.toString()) {
+          // child.opacity = 0.5;
+          // child.setValues({ opacity: 0.5 })
+        } else {
+          // console.log(`Updating ${child.name} at ${elapsedTime}`);
+          // child.opacity = 1.0;
+          child.rotateX(1);
+          // child.setValues({ opacity: 1 })
+        }
+      });
+    };
+
+    world.start();
+
     this.element.removeEventListener("click", this.clickHandler);
     this.element.addEventListener("click", this.clickHandler);
   }
@@ -232,17 +370,24 @@ const renderAudioVisitor = (value, location, scene) => {
 
   const size = 0.1;
 
-  const color = new THREE.Color(0.5, 0.5, 0.5);
+  const color = new THREE.Color(1, 1, 1);
 
   const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
-  const material = new THREE.MeshBasicMaterial({
+  const material = new THREE.MeshToonMaterial({
     color,
+    opacity: 0.5,
   });
   const cube = new THREE.Mesh(geometry, material);
-  scene.add(cube);
+
   cube.position.x = (x / AUDIO_STEP) * size;
   cube.position.y = 0;
   cube.position.z = 0;
+
+  cube.name = `${Math.floor(x / AUDIO_STEP)}`;
+
+  scene.add(cube);
+
+  return cube;
 };
 
 const renderCubeVisitor = (value, location, scene) => {
@@ -257,10 +402,13 @@ const renderCubeVisitor = (value, location, scene) => {
     color,
   });
   const cube = new THREE.Mesh(geometry, material);
-  scene.add(cube);
   cube.position.x = (x || 0) * size;
   cube.position.y = (y || 0) * size;
   cube.position.z = (z || 0) * size;
+
+  scene.add(cube);
+
+  return cube;
 };
 
 class TensorView {
@@ -360,15 +508,15 @@ class SeriesView {
   }
 }
 
-// const attachDataList = (parentId, data, itemElementName, transform) => {
-//   const parentElement = document.getElementById(parentId);
-//   parentElement.innerHTML = "";
-//   data.forEach((item) => {
-//     const child = document.createElement(itemElementName);
-//     const mutated = transform(item, child);
-//     parentElement.appendChild(mutated);
-//   });
-// };
+const attachDataList = (parentId, data, itemElementName, transform) => {
+  const parentElement = document.getElementById(parentId);
+  parentElement.innerHTML = "";
+  data.forEach((item) => {
+    const child = document.createElement(itemElementName);
+    const mutated = transform(item, child);
+    parentElement.appendChild(mutated);
+  });
+};
 
 const conjure = async (
   {
@@ -459,59 +607,57 @@ const conjure = async (
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-    conjure();
-    return;
-
     // TODO: This is dumb.  This entire script should be separate,
     // or even generated server-side
-    // if (!window.location.href.includes("dashboard")) {
-    //   return;
-    // }
+    if (!window.location.href.includes("dashboard")) {
+      conjure();
+      return;
+    }
 
-    // // TODO: Display the latest items from each function's feed,
-    // // all at once
+    // TODO: Display the latest items from each function's feed,
+    // all at once
 
-    // // list the functions
-    // const data = await fetch("/functions").then((resp) => resp.json());
+    // list the functions
+    const data = await fetch("/functions").then((resp) => resp.json());
 
-    // attachDataList("functions", data, "li", (d, c) => {
-    //   c.innerText = `${d.name} - ${d.content_type}`;
+    attachDataList("functions", data, "li", (d, c) => {
+      c.innerText = `${d.name} - ${d.content_type}`;
 
-    //   const preElement = document.createElement("pre");
-    //   preElement.innerText = d.code;
-    //   c.appendChild(preElement);
+      const preElement = document.createElement("pre");
+      preElement.innerText = d.code;
+      c.appendChild(preElement);
 
-    //   c.addEventListener("click", async () => {
-    //     // first, clear the display
-    //     const display = document.getElementById("display");
-    //     display.innerHTML = "";
+      c.addEventListener("click", async () => {
+        // first, clear the display
+        const display = document.getElementById("display");
+        display.innerHTML = "";
 
-    //     // TODO: Get the most recent key from the feed, only display
-    //     // that key, and set it to auto-refresh
+        // TODO: Get the most recent key from the feed, only display
+        // that key, and set it to auto-refresh
 
-    //     // when a function is clicked, list its keys
-    //     const { keys } = await fetch(d.url).then((resp) => resp.json());
+        // when a function is clicked, list its keys
+        const { keys } = await fetch(d.url).then((resp) => resp.json());
 
-    //     // create elements for each of the keys
-    //     attachDataList("keys", keys, "div", (key, div) => {
-    //       div.id = `id-${key}`;
-    //       div.setAttribute(
-    //         "data-conjure",
-    //         JSON.stringify({
-    //           key,
-    //           feed_uri: `/feed/${d.id}`,
-    //           public_uri: `/functions/${d.id}/${key}`,
-    //           content_type: d.content_type,
-    //         })
-    //       );
-    //       return div;
-    //     });
+        // create elements for each of the keys
+        attachDataList("keys", keys, "div", (key, div) => {
+          div.id = `id-${key}`;
+          div.setAttribute(
+            "data-conjure",
+            JSON.stringify({
+              key,
+              feed_uri: `/feed/${d.id}`,
+              public_uri: `/functions/${d.id}/${key}`,
+              content_type: d.content_type,
+            })
+          );
+          return div;
+        });
 
-    //     // hydrate all the conjure elements
-    //     await conjure({ refreshRate: 5000 });
-    //   });
-    //   return c;
-    // });
+        // hydrate all the conjure elements
+        await conjure();
+      });
+      return c;
+    });
   },
   false
 );
