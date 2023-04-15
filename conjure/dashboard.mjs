@@ -238,12 +238,13 @@ class TensorData {
 }
 
 class AudioView {
-  constructor(elementId, tensor, url) {
+  constructor(elementId, tensor, url, stepSize = 512) {
     this.elementId = elementId;
     this.tensor = tensor;
     this.url = url;
     this.playStartTime = null;
     this.world = null;
+    this.stepSize = stepSize;
 
     this.clickHandler = () => {
       this.playStartTime = this.world.elapsedTime;
@@ -270,7 +271,7 @@ class AudioView {
     const renderAudioVisitor = (value, location, scene) => {
       const [x, y, z] = location;
 
-      if (x % AUDIO_STEP !== 0) {
+      if (x % this.stepSize !== 0) {
         return;
       }
 
@@ -284,11 +285,11 @@ class AudioView {
       });
       const cube = new THREE.Mesh(geometry, material);
 
-      cube.position.x = (x / AUDIO_STEP) * size;
+      cube.position.x = (x / this.stepSize) * size;
       cube.position.y = 0;
       cube.position.z = 0;
 
-      cube.name = `${Math.floor(x / AUDIO_STEP)}`;
+      cube.name = `${Math.floor(x / this.stepSize)}`;
 
       scene.add(cube);
 
@@ -329,7 +330,7 @@ class AudioView {
       }
 
       const currentTime = elapsedTime - this.playStartTime;
-      const currentBlock = Math.round((currentTime * this.samplerate) / 512);
+      const currentBlock = Math.round((currentTime * this.samplerate) / this.stepSize);
       // const cube = this.world.getObjectByName(currentBlock);
 
       this.world.traverseChildren((child) => {
@@ -353,8 +354,6 @@ class AudioView {
     this.element.addEventListener("click", this.clickHandler);
   }
 }
-
-const AUDIO_STEP = 512;
 
 const renderCubeVisitor = (value, location, scene) => {
   const [x, y, z] = location;
