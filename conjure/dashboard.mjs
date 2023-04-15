@@ -122,7 +122,6 @@ class World {
   }
 
   traverseChildren(func) {
-    // this.scene.traverse(func);
     this.scene.children.forEach(func);
   }
 
@@ -144,44 +143,6 @@ class World {
     throw new Error("Not Implemented");
   }
 }
-
-// const setupScene = (myCanvas, cameraPosition = [10, 10, 10]) => {
-//   const axes = new THREE.AxesHelper();
-
-//   const scene = new THREE.Scene();
-//   scene.add(axes);
-
-//   const camera = new THREE.PerspectiveCamera(
-//     50,
-//     myCanvas.offsetWidth / myCanvas.offsetHeight
-//   );
-//   camera.position.set(...cameraPosition);
-//   camera.lookAt(scene.position);
-
-//   const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
-//   renderer.setClearColor(0x000, 1.0);
-//   renderer.setPixelRatio(window.devicePixelRatio);
-//   renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
-
-//   const orbitControls = new OrbitControls(camera, renderer.domElement);
-//   orbitControls.maxPolarAngle = Math.PI * 0.5;
-//   orbitControls.minDistance = 0.1;
-//   orbitControls.maxDistance = 100;
-
-//   const clock = new THREE.Clock(true);
-
-//   renderer.setAnimationLoop(() => {
-//     // TODO: I need to be able to inject code here, and get
-//     // the elapsed time passed in as a parameter
-//     orbitControls.update();
-//     renderer.render(scene, camera);
-//   });
-
-//   const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
-//   scene.add(light);
-
-//   return scene;
-// };
 
 class TensorData {
   /**
@@ -305,6 +266,38 @@ class AudioView {
     view.render();
   }
 
+  buildVisitor() {
+    const renderAudioVisitor = (value, location, scene) => {
+      const [x, y, z] = location;
+
+      if (x % AUDIO_STEP !== 0) {
+        return;
+      }
+
+      const size = 0.1;
+
+      const color = new THREE.Color(0x666666);
+
+      const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
+      const material = new THREE.MeshLambertMaterial({
+        color,
+      });
+      const cube = new THREE.Mesh(geometry, material);
+
+      cube.position.x = (x / AUDIO_STEP) * size;
+      cube.position.y = 0;
+      cube.position.z = 0;
+
+      cube.name = `${Math.floor(x / AUDIO_STEP)}`;
+
+      scene.add(cube);
+
+      return cube;
+    };
+
+    return renderAudioVisitor;
+  }
+
   get samplerate() {
     return this.tensor.metadata.samplerate;
   }
@@ -322,8 +315,10 @@ class AudioView {
     const world = new World(this.element, [50, 0, 50]);
     this.world = world;
 
+    const visitor = this.buildVisitor();
+
     // render the initial scene
-    this.tensor.visit(renderAudioVisitor, world.scene);
+    this.tensor.visit(visitor, world.scene);
 
     // set the update function on the world
     world.sceneUpdater = (elapsedTime) => {
@@ -360,34 +355,6 @@ class AudioView {
 }
 
 const AUDIO_STEP = 512;
-
-const renderAudioVisitor = (value, location, scene) => {
-  const [x, y, z] = location;
-
-  if (x % AUDIO_STEP !== 0) {
-    return;
-  }
-
-  const size = 0.1;
-
-  const color = new THREE.Color(0x666666);
-
-  const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
-  const material = new THREE.MeshLambertMaterial({
-    color,
-  });
-  const cube = new THREE.Mesh(geometry, material);
-
-  cube.position.x = (x / AUDIO_STEP) * size;
-  cube.position.y = 0;
-  cube.position.z = 0;
-
-  cube.name = `${Math.floor(x / AUDIO_STEP)}`;
-
-  scene.add(cube);
-
-  return cube;
-};
 
 const renderCubeVisitor = (value, location, scene) => {
   const [x, y, z] = location;
