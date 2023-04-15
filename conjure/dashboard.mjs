@@ -132,8 +132,6 @@ class World {
       if (this.sceneUpdater !== null) {
         this.sceneUpdater(this.elapsedTime);
       }
-      // TODO: I need to be able to inject code here, and get
-      // the elapsed time passed in as a parameter
       this.orbitControls.update();
       this.renderer.render(this.scene, this.camera);
     });
@@ -330,7 +328,9 @@ class AudioView {
       }
 
       const currentTime = elapsedTime - this.playStartTime;
-      const currentBlock = Math.round((currentTime * this.samplerate) / this.stepSize);
+      const currentBlock = Math.round(
+        (currentTime * this.samplerate) / this.stepSize
+      );
       // const cube = this.world.getObjectByName(currentBlock);
 
       this.world.traverseChildren((child) => {
@@ -355,31 +355,11 @@ class AudioView {
   }
 }
 
-const renderCubeVisitor = (value, location, scene) => {
-  const [x, y, z] = location;
-
-  const size = 0.5;
-
-  const color = new THREE.Color(1 * value, 0.5 * value, 0.1 * value);
-
-  const geometry = new THREE.BoxGeometry(size, size, size);
-  const material = new THREE.MeshBasicMaterial({
-    color,
-  });
-  const cube = new THREE.Mesh(geometry, material);
-  cube.position.x = (x || 0) * size;
-  cube.position.y = (y || 0) * size;
-  cube.position.z = (z || 0) * size;
-
-  scene.add(cube);
-
-  return cube;
-};
-
 class TensorView {
   constructor(elementId, tensor) {
     this.elementId = elementId;
     this.tensor = tensor;
+    this.world = null;
   }
 
   static async renderURL(url, elementId) {
@@ -392,12 +372,74 @@ class TensorView {
     return document.getElementById(this.elementId);
   }
 
+  buildVisitor() {
+    const renderCubeVisitor = (value, location, scene) => {
+      const [x, y, z] = location;
+
+      const size = 0.5;
+
+      const color = new THREE.Color(1 * value, 0.5 * value, 0.1 * value);
+
+      const geometry = new THREE.BoxGeometry(size, size, size);
+      const material = new THREE.MeshBasicMaterial({
+        color,
+      });
+      const cube = new THREE.Mesh(geometry, material);
+      cube.position.x = (x || 0) * size;
+      cube.position.y = (y || 0) * size;
+      cube.position.z = (z || 0) * size;
+
+      scene.add(cube);
+
+      return cube;
+    };
+    return renderCubeVisitor;
+  }
+
   render() {
     console.log(
       `Setting up scene with ${TensorView.name} and ${this.element.id}`
     );
-    const scene = setupScene(this.element);
-    this.tensor.visit(renderCubeVisitor, scene);
+
+    // set up the world and store a reference
+    const world = new World(this.element, [50, 0, 50]);
+    this.world = world;
+
+    const visitor = this.buildVisitor();
+
+    // render the initial scene
+    this.tensor.visit(visitor, world.scene);
+
+    // // set the update function on the world
+    // world.sceneUpdater = (elapsedTime) => {
+    //   if (this.playStartTime === null) {
+    //     // the audio isn't currently playing, so there's
+    //     // no need to animate anything
+    //     return;
+    //   }
+
+    //   const currentTime = elapsedTime - this.playStartTime;
+    //   const currentBlock = Math.round(
+    //     (currentTime * this.samplerate) / this.stepSize
+    //   );
+    //   // const cube = this.world.getObjectByName(currentBlock);
+
+    //   this.world.traverseChildren((child) => {
+    //     if (!child.material) {
+    //       return;
+    //     }
+
+    //     if (child.name !== currentBlock.toString()) {
+    //       child.scale.set(1, 1, 1);
+    //       child.material.color.setHex(0x666666);
+    //     } else {
+    //       child.scale.set(2, 1, 1);
+    //       child.material.color.setHex(0x999999);
+    //     }
+    //   });
+    // };
+
+    world.start();
   }
 }
 
