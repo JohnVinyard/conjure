@@ -355,6 +355,56 @@ class AudioView {
   }
 }
 
+class TensorMovieView {
+  constructor(elementId, tensor) {
+    this.elementId = elementId;
+    this.tensor = tensor;
+    this.world = null;
+
+    this.playStartTime = null;
+    this.clickHandler = () => {
+      // TODO: Set a timeout and set playStartTime to null
+    }
+  }
+
+  get samplerate() {
+    return this.tensor.metadata.samplerate;
+  }
+
+  get element() {
+    return document.getElementById(this.elementId);
+  }
+
+  static async renderURL(url, elementId) {
+    const data = await TensorData.fromURL(url);
+    const view = new TensorMovieView(elementId, data);
+    view.render();
+  }
+
+  buildVisitor() {
+    return (value, location, scene) => {};
+  }
+
+  render() {
+    console.log(
+      `Setting up scene with ${TensorMovieView.name} and ${this.element.id}`
+    );
+
+    // set up the world and store a reference
+    const world = new World(this.element, [50, 0, 50]);
+    this.world = world;
+
+    const visitor = this.buildVisitor();
+
+    // render the initial scene
+    this.tensor.visit(visitor, world.scene);
+
+    world.sceneUpdater = (elapsedTime) => {};
+
+    world.start();
+  }
+}
+
 class TensorView {
   constructor(elementId, tensor) {
     this.elementId = elementId;
@@ -524,11 +574,13 @@ const conjure = async (
   const contentTypeToRenderClass = {
     "application/tensor+octet-stream": TensorView,
     "application/time-series+octet-stream": SeriesView,
+    "application/tensor-movie+octet-stream": TensorMovieView,
     "audio/wav": AudioView,
   };
 
   const contentTypeToRootElementType = {
     "application/tensor+octet-stream": "canvas",
+    "application/tensor-movie+octet-stream": "canvas",
     "application/time-series+octet-stream": "div",
     "audio/wav": "canvas",
   };
