@@ -57,7 +57,11 @@ const dtypeToConstructor = (dtype) => {
     return Float64Array;
   }
 
-  throw new Error("Not Implemented");
+  if (dtype === "<u4") {
+    return Uint32Array;
+  }
+
+  throw new Error(`Type ${dtype} not implemented`);
 };
 
 const product = (arr) => {
@@ -117,6 +121,10 @@ class World {
     this.sceneUpdater = null;
   }
 
+  get nChilidren() {
+    return this.scene.children.length;
+  }
+
   getObjectByName(name) {
     return this.scene.getObjectByName(name);
   }
@@ -156,6 +164,10 @@ class TensorData {
     this.metadata = metadata;
   }
 
+  get nDim() {
+    return this.shape.length;
+  }
+
   get totalSize() {
     return this.data.length;
   }
@@ -186,7 +198,25 @@ class TensorData {
     return min;
   }
 
+  getElement(channel) {
+    // return a new tensor resulting from index
+    // the first dimension of this one, or, if the
+    // tensor is one dimensional, return the value
+    if (this.nDim === 1) {
+      return this.data.at(channel);
+    }
+
+    const channelStride = this.strides[0];
+
+    const remainingShape = this.shape.slice(1);
+    const start = channel * channelStride;
+    const nElements = product(remainingShape);
+    const newData = this.data.slice(start, start + nElements);
+    return new TensorData(newData, remainingShape);
+  }
+
   getChannelData(channel) {
+    // TODO: replace this with the more general getElement
     const [channelStride, elementStride] = this.strides;
     const output = [];
 
@@ -356,19 +386,43 @@ class AudioView {
 }
 
 class TensorMovieView {
-  constructor(elementId, tensor) {
+  constructor(elementId, tensor, samplerate = 42) {
     this.elementId = elementId;
     this.tensor = tensor;
     this.world = null;
+    this.samplerate = samplerate;
 
     this.playStartTime = null;
+
+    const durationMs = (this.tensor.shape[0] / this.samplerate) * 1000;
+
     this.clickHandler = () => {
-      // TODO: Set a timeout and set playStartTime to null
-    }
+      this.playStartTime = this.world.elapsedTime;
+      setTimeout(() => {
+        this.playStartTime = null;
+      }, durationMs);
+    };
+
+    this.textureCache = {};
   }
 
-  get samplerate() {
-    return this.tensor.metadata.samplerate;
+  textureAtPosition(index) {
+    if (this.textureCache[index]) {
+      return this.textureCache[index];
+    }
+
+    const textureData = this.tensor.getElement(index);
+
+    const texture = new THREE.DataTexture(
+      textureData.data,
+      textureData.shape[0],
+      textureData.shape[1],
+      THREE.LuminanceFormat,
+      THREE.UnsignedIntType
+    );
+    texture.needsUpdate = true;
+    this.textureCache[texture];
+    return texture;
   }
 
   get element() {
@@ -381,8 +435,27 @@ class TensorMovieView {
     view.render();
   }
 
-  buildVisitor() {
-    return (value, location, scene) => {};
+  initScene() {
+    const texture = this.textureAtPosition(0);
+    const size = 0.5;
+
+    const color = new THREE.Color(1, 0.5, 1);
+
+    const geometry = new THREE.PlaneGeometry(size, size);
+
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      displacementMap: texture,
+      displacementScale: 1,
+      displacementBias: 0.1,
+    });
+    const cube = new THREE.Mesh(geometry, material);
+    cube.name = "plane";
+    cube.position.x = 0;
+    cube.position.y = 0;
+    cube.position.z = 0;
+
+    this.world.scene.add(cube);
   }
 
   render() {
@@ -390,16 +463,40 @@ class TensorMovieView {
       `Setting up scene with ${TensorMovieView.name} and ${this.element.id}`
     );
 
+    console.log(
+      "Tensor with max: ",
+      this.tensor.maxValue,
+      this.tensor.minValue
+    );
+
     // set up the world and store a reference
-    const world = new World(this.element, [50, 0, 50]);
+    const world = new World(this.element, [1, 0, 1]);
     this.world = world;
 
-    const visitor = this.buildVisitor();
+    // const visitor = this.buildVisitor();
 
     // render the initial scene
-    this.tensor.visit(visitor, world.scene);
+    // this.tensor.visit(visitor, world.scene);
+    this.initScene();
 
-    world.sceneUpdater = (elapsedTime) => {};
+    world.sceneUpdater = (elapsedTime) => {
+      if (!this.playStartTime) {
+        return;
+      }
+
+      const currentTime = elapsedTime - this.playStartTime;
+      const currentFrame = Math.round(currentTime * this.samplerate);
+
+      const texture = this.textureAtPosition(currentFrame);
+
+      const plane = this.world.getObjectByName("plane");
+
+      plane.material.bumpMap = texture;
+      plane.material.needsUpdate = true;
+    };
+
+    this.element.removeEventListener("click", this.clickHandler);
+    this.element.addEventListener("click", this.clickHandler);
 
     world.start();
   }

@@ -22,6 +22,12 @@ class MetaData(object):
         self.content_type = content_type
         self.content_length = content_length
     
+    def __str__(self):
+        return f'MetaData(key={self.key}, public_uri={self.public_uri}, content_type={self.content_type}, content_length={self.content_length})'
+    
+    def __repr__(self):
+        return self.__str__()
+    
     def conjure_collection(self, local_path, remote_bucket, public=False):
         return LocalCollectionWithBackup(
             local_path=local_path,
@@ -234,10 +240,10 @@ def json_conjure(storage: Collection, tag_deserialized=False):
     )
 
 
-def numpy_conjure(storage: Collection):
+def numpy_conjure(storage: Collection, content_type=SupportedContentType.Tensor.value):
 
     return conjure(
-        content_type=SupportedContentType.Tensor.value,
+        content_type=content_type,
         storage=storage,
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
