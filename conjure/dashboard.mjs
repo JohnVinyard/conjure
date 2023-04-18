@@ -107,7 +107,8 @@ class World {
 
     const clock = new THREE.Clock(true);
 
-    const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+    const light = new THREE.PointLight(0xffffff, 1, 100);
+    light.position.set(1, 1, 1);
     scene.add(light);
 
     this.scene = scene;
@@ -119,6 +120,11 @@ class World {
     this.elapsedTime = 0;
 
     this.sceneUpdater = null;
+
+    console.log(this.renderer.getContext().getExtension("OES_texture_float"));
+    console.log(
+      this.renderer.getContext().getExtension("OES_texture_float_linear")
+    );
   }
 
   get nChilidren() {
@@ -196,6 +202,35 @@ class TensorData {
     }
 
     return min;
+  }
+
+  toRGBA() {
+    const arr = new Uint8ClampedArray(this.totalSize * 4);
+
+    this.visit((value, loc, scene) => {
+      const [x, y] = loc;
+      const scaled = Math.floor(value * 255);
+      const pos =
+        Math.floor(x * this.strides[0]) + Math.floor(y * this.strides[1]);
+      arr[pos] = scaled;
+      arr[pos + 1] = scaled;
+      arr[pos + 2] = scaled;
+      arr[pos + 3] = scaled;
+    });
+
+    // for (let i = 0; i < this.totalSize; i++) {
+    //   const position = i * 4;
+    //   const value = Math.floor(this.data.at(i) * 255);
+
+    //   // console.log(value);
+    //   // const value = Math.random() * 255;
+
+    //   arr[position] = value;
+    //   arr[position + 1] = value;
+    //   arr[position + 2] = value;
+    //   arr[position + 3] = value;
+    // }
+    return arr;
   }
 
   getElement(channel) {
@@ -413,13 +448,22 @@ class TensorMovieView {
 
     const textureData = this.tensor.getElement(index);
 
+    // const intArray = new Uint8ClampedArray(textureData.data.buffer);
+    const intArray = textureData.toRGBA();
+
+    const width = textureData.shape[0];
+    const height = textureData.shape[1];
+
+    // console.log(textureData.data.length, intArray.length, width * height);
+
     const texture = new THREE.DataTexture(
-      textureData.data,
-      textureData.shape[0],
-      textureData.shape[1],
-      THREE.LuminanceFormat,
-      THREE.UnsignedIntType
+      intArray,
+      width,
+      height,
+      THREE.RedFormat,
+      THREE.UnsignedByteType
     );
+
     texture.needsUpdate = true;
     this.textureCache[texture];
     return texture;
@@ -439,15 +483,16 @@ class TensorMovieView {
     const texture = this.textureAtPosition(0);
     const size = 0.5;
 
-    const color = new THREE.Color(1, 0.5, 1);
+    // const color = new THREE.Color(1, 1, 1);
 
-    const geometry = new THREE.PlaneGeometry(size, size);
+    const geometry = new THREE.PlaneBufferGeometry(size, size);
 
     const material = new THREE.MeshStandardMaterial({
-      color,
+      color: 0xffffff,
+      // alphaMap: texture,
+      // transparent: true,
       displacementMap: texture,
-      displacementScale: 1,
-      displacementBias: 0.1,
+      // displacementScale: 100
     });
     const cube = new THREE.Mesh(geometry, material);
     cube.name = "plane";

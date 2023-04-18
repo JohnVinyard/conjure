@@ -31,13 +31,11 @@ def scattering_like_transform(arr: np.ndarray):
     windowed = spec.unfold(-1, window_size, step_size)
 
     scatter = torch.abs(torch.fft.rfft(windowed, dim=-1, norm='ortho'))
-    result = scatter.view(channels, -1, n_coeffs).permute(1, 0, 2).float()
+    result = scatter.view(channels, -1, n_coeffs).permute(1, 2, 0).float()
 
     data = result.data.cpu().numpy()
     data = data / data.max()  # normalize
-    data = data * 255
-    data = data.astype(np.uint32)
-    print(data)
+
     return data
 
 
