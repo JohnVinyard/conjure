@@ -3,9 +3,12 @@ from urllib.parse import ParseResult, urlparse
 import lmdb
 import boto3
 from shutil import rmtree
-
 from conjure.timestamp import timestamp_id
 
+
+def get_account_id():
+    client = boto3.client("sts")
+    return client.get_caller_identity()["Account"]
 
 def ensure_bytes(value: Union[str, bytes, memoryview]) -> bytes:
     if isinstance(value, memoryview):
@@ -47,7 +50,6 @@ class Collection(object):
         raise NotImplementedError()
 
 
-# TODO: Create the bucket if it doesn't already exist and enable CORS
 class S3Collection(Collection):
 
     def __init__(self, bucket, is_public=False, cors_enabled=False):
@@ -92,11 +94,18 @@ class S3Collection(Collection):
         raise NotImplementedError()
 
     def _create_bucket(self):
-        # TODO: CORS settings for bucket
+
         try:
             self.client.create_bucket(
-                ACL=self.acl,
-                Bucket=self.bucket)
+                Bucket=self.bucket,
+                ObjectOwnership='ObjectWriter')
+            self.client.delete_public_access_block(
+                Bucket=self.bucket, 
+                ExpectedBucketOwner=get_account_id())
+            self.client.put_bucket_acl(
+                Bucket=self.bucket, 
+                ACL=self.acl, 
+                ExpectedBucketOwner=get_account_id())
         except self.client.exceptions.BucketAlreadyExists:
             pass
 

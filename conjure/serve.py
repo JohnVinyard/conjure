@@ -100,8 +100,26 @@ class Dashboard(object):
             script = f.read()
 
         with open(os.path.join(MODULE_DIR, 'dashboard.html'), 'r') as f:
+            """
+            attachDataList("keys", keys, "div", (key, div) => {
+          div.id = `id-${key}`;
+          div.setAttribute(
+            "data-conjure",
+            JSON.stringify({
+              key,
+              feed_uri: `/feed/${d.id}`,
+              public_uri: `/functions/${d.id}/${key}`,
+              content_type: d.content_type,
+            })
+          );
+          return div;
+        });
+            """
             content = f.read()
             res.content_length = len(content)
+            # TODO: a way to get the most recently created key
+            # TODO: script sets refresh rate
+            items = map(lambda x: x, self.conjure_funcs.values())
             res.body = content.format(
                 script=script,
                 imports=imports,

@@ -2,3 +2,22 @@
   width: 500px;
   height: 500px;
 }
+
+.container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  height: 1000px;
+  width: 100%;
+  background-color: #eee;
+  row-gap: 10px;
+  column-gap: 10px;
+}
+
+.item {
+  display: flex;
+  width: 500px;
+  height: 500px;
+  background-color: #333;
+  border: solid 1px #000;
+}

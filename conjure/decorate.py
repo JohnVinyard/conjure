@@ -105,6 +105,10 @@ class Conjure(object):
             raise ValueError(
                 f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
+    
+    def most_recent_key(self):
+        all_keys = list(self.feed())
+        return all_keys[-1]
 
     @property
     def code(self):

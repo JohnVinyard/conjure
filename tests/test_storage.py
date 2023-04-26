@@ -20,7 +20,8 @@ class TestExploratory(TestCase):
         cls.db = LocalCollectionWithBackup(
             f'/tmp/{cls.path}',
             remote_bucket=cls.bucket_name,
-            is_public=True)
+            is_public=True,
+            cors_enabled=True)
 
 
     def test_supports_public_uri(self):

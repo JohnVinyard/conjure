@@ -161,6 +161,35 @@ class DecorateTests(TestCase):
 
         self.assertEqual(2, len(bigger_feed))
         self.assertEqual(3, len(smaller_feed))
+    
+
+    def test_can_get_most_recent_key(self):
+        @json_conjure(self.db)
+        def make_bigger(d: dict) -> dict:
+            d = dict(**d)
+            keys = list(d.keys())
+            for key in keys:
+                d[f'{key}_bigger'] = d[key] * 10
+            return d
+
+        @json_conjure(self.db)
+        def make_smaller(d: dict) -> dict:
+            d = dict(**d)
+            keys = list(d.keys())
+            for key in keys:
+                d[f'{key}_smaller'] = d[key] / 10
+            return d
+
+        make_bigger({'a': 10, 'b': 3})
+        make_bigger({'z': 11, 'b': 3})
+
+        make_smaller({'z': 11, 'b': 3})
+        make_smaller({'a': 11, 'b': 3})
+        make_smaller({'j': 11, 'q': 3})
+
+        smaller_feed = list(make_smaller.feed())
+
+        self.assertEqual(make_smaller.most_recent_key(), smaller_feed[-1])
 
     def test_can_register_listener(self):
         @json_conjure(self.db)
