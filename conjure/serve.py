@@ -1,10 +1,14 @@
-from typing import List
+from typing import List, Union
+from urllib.parse import ParseResult, urlparse
 import falcon
 from conjure.decorate import Conjure
 import multiprocessing
 import gunicorn.app.base
 import sys
 import os
+import json
+
+from conjure.storage import ensure_bytes, ensure_str
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -69,6 +73,7 @@ class FunctionFeed(object):
     def __init__(self, functions: List[Conjure]):
         super().__init__()
         self.functions = {f.identifier: f for f in functions}
+        print(list(self.functions.keys()))
 
     def on_get(self, req: falcon.Request, res: falcon.Response, identifier: str):
         try:
@@ -84,9 +89,20 @@ class FunctionFeed(object):
 
 class Dashboard(object):
 
-    def __init__(self, conjure_funcs: List[Conjure]):
+    def __init__(self, conjure_funcs: List[Conjure], port: int = None):
         super().__init__()
         self.conjure_funcs = {f.identifier: f for f in conjure_funcs}
+        self.port = port
+    
+    def _uri(self, conj: Conjure, key: Union[str, bytes]) -> ParseResult:
+        return urlparse(f'http://localhost:{self.port}/functions/{conj.identifier}/{ensure_str(key)}')
+    
+
+    def _item_html(self, conjure: Conjure) -> str:
+        meta = conjure.most_recent_meta()
+        meta = meta.with_public_uri(self._uri(conjure, meta.key))
+        html = meta.conjure_html()
+        return html
 
     def on_get(self, req: falcon.Request, res: falcon.Response):
 
@@ -100,46 +116,31 @@ class Dashboard(object):
             script = f.read()
 
         with open(os.path.join(MODULE_DIR, 'dashboard.html'), 'r') as f:
-            """
-            attachDataList("keys", keys, "div", (key, div) => {
-          div.id = `id-${key}`;
-          div.setAttribute(
-            "data-conjure",
-            JSON.stringify({
-              key,
-              feed_uri: `/feed/${d.id}`,
-              public_uri: `/functions/${d.id}/${key}`,
-              content_type: d.content_type,
-            })
-          );
-          return div;
-        });
-            """
             content = f.read()
             res.content_length = len(content)
-            # TODO: a way to get the most recently created key
-            # TODO: script sets refresh rate
-            items = map(lambda x: x, self.conjure_funcs.values())
+            items = map(lambda x: self._item_html(x), self.conjure_funcs.values())
             res.body = content.format(
                 script=script,
                 imports=imports,
-                style=style)
+                style=style,
+                items='\n'.join(items))
             res.set_header('content-type', 'text/html')
             res.status = falcon.HTTP_OK
 
 
 class MutliFunctionApplication(falcon.API):
 
-    def __init__(self, conjure_funcs: List[Conjure]):
+    def __init__(self, conjure_funcs: List[Conjure], port: int = None):
         super().__init__(middleware=[])
         self.functions = conjure_funcs
+        self.port = port
 
         self.add_route('/functions', ListFunctions(conjure_funcs))
         self.add_route('/functions/{identifier}', Function(conjure_funcs))
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',
                        FunctionResult(conjure_funcs))
-        self.add_route('/dashboard', Dashboard(conjure_funcs))
+        self.add_route('/dashboard', Dashboard(conjure_funcs, port=port))
 
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):
@@ -165,7 +166,7 @@ def serve_conjure(
         n_workers: int = None,
         revive=True):
 
-    app = MutliFunctionApplication(conjure_funcs)
+    app = MutliFunctionApplication(conjure_funcs, port=port)
 
     def worker_int(worker):
         if not revive:

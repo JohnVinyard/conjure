@@ -15,12 +15,22 @@ from urllib.parse import urlunparse
 
 
 class MetaData(object):
-    def __init__(self, key, public_uri: ParseResult, content_type, content_length):
+    def __init__(self, key, public_uri: ParseResult, content_type, content_length, identifier):
         super().__init__()
         self.key = key
         self.public_uri = public_uri
         self.content_type = content_type
         self.content_length = content_length
+        self.identifier = identifier
+    
+    def with_public_uri(self, public_uri: ParseResult):
+        return MetaData(
+            key=self.key,
+            public_uri=public_uri,
+            content_type=self.content_type,
+            content_length=self.content_length,
+            identifier=self.identifier
+        )
     
     def __str__(self):
         return f'MetaData(key={self.key}, public_uri={self.public_uri}, content_type={self.content_type}, content_length={self.content_length})'
@@ -40,7 +50,7 @@ class MetaData(object):
             'key': ensure_str(self.key),
             'public_uri': urlunparse(self.public_uri),
             'content_type': self.content_type,
-            'feed_uri': f'/feed/{ensure_str(self.key)}'
+            'feed_uri': f'/feed/{ensure_str(self.identifier)}'
         }
         return f'<div id="conjure-id-{ensure_str(self.key)}" data-conjure=\'{json.dumps(conjure_data)}\'></div>'
 
@@ -106,9 +116,14 @@ class Conjure(object):
                 f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
     
-    def most_recent_key(self):
+    def most_recent_key(self) -> str:
         all_keys = list(self.feed())
-        return all_keys[-1]
+        print(f'{self.name} - {len(all_keys)} - {len(list(self.iter_keys()))}')
+        return all_keys[-1]['key']
+    
+    def most_recent_meta(self) -> MetaData:
+        key = self.most_recent_key()
+        return self.meta_from_key(key)
 
     @property
     def code(self):
@@ -137,12 +152,9 @@ class Conjure(object):
         key = self.key(*args, **kwargs)
         return key in self.storage
 
-    def meta(self, *args, **kwargs):
-        key = self.key(*args, **kwargs)
-
+    def meta_from_key(self, key) -> MetaData:
         # KLUDGE: Implement "head" requests to get object
         # size without reading into memory/pulling from s3
-
         uri = None
         try:
             uri = self.storage.public_uri(key)
@@ -153,8 +165,13 @@ class Conjure(object):
             key=key,
             public_uri=uri,
             content_type=self.content_type,
-            content_length=self.storage.content_length(key))
+            content_length=self.storage.content_length(key),
+            identifier=self.identifier)
 
+    def meta(self, *args, **kwargs) -> MetaData:
+        key = self.key(*args, **kwargs)
+        return self.meta_from_key(key)
+        
     @property
     def identifier(self):
         return self.func_identifier.derive_name(self.callable)
@@ -180,7 +197,8 @@ class Conjure(object):
                 key=key,
                 public_uri=public_uri,
                 content_type=self.content_type,
-                content_length=self.storage.content_length(key)
+                content_length=self.storage.content_length(key),
+                identifier=self.identifier
             )
         )
 
