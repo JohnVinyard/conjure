@@ -189,7 +189,7 @@ class DecorateTests(TestCase):
 
         smaller_feed = list(make_smaller.feed())
 
-        self.assertEqual(make_smaller.most_recent_key(), smaller_feed[-1])
+        self.assertEqual(make_smaller.most_recent_key(), smaller_feed[-1]['key'])
 
     def test_can_register_listener(self):
         @json_conjure(self.db)

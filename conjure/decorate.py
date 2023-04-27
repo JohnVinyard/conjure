@@ -22,7 +22,7 @@ class MetaData(object):
         self.content_type = content_type
         self.content_length = content_length
         self.identifier = identifier
-    
+
     def with_public_uri(self, public_uri: ParseResult):
         return MetaData(
             key=self.key,
@@ -31,13 +31,13 @@ class MetaData(object):
             content_length=self.content_length,
             identifier=self.identifier
         )
-    
+
     def __str__(self):
         return f'MetaData(key={self.key}, public_uri={self.public_uri}, content_type={self.content_type}, content_length={self.content_length})'
-    
+
     def __repr__(self):
         return self.__str__()
-    
+
     def conjure_collection(self, local_path, remote_bucket, public=False):
         return LocalCollectionWithBackup(
             local_path=local_path,
@@ -115,12 +115,11 @@ class Conjure(object):
             raise ValueError(
                 f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
-    
+
     def most_recent_key(self) -> str:
         all_keys = list(self.feed())
-        print(f'{self.name} - {len(all_keys)} - {len(list(self.iter_keys()))}')
         return all_keys[-1]['key']
-    
+
     def most_recent_meta(self) -> MetaData:
         key = self.most_recent_key()
         return self.meta_from_key(key)
@@ -171,7 +170,7 @@ class Conjure(object):
     def meta(self, *args, **kwargs) -> MetaData:
         key = self.key(*args, **kwargs)
         return self.meta_from_key(key)
-        
+
     @property
     def identifier(self):
         return self.func_identifier.derive_name(self.callable)

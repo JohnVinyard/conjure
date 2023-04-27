@@ -1,12 +1,19 @@
 import numpy as np
 from conjure.decorate import numpy_conjure, time_series_conjure
 from conjure.serve import serve_conjure
-from conjure.storage import LmdbCollection
+from conjure.storage import LmdbCollection, LocalCollectionWithBackup
 from time import sleep
 from threading import Thread
 from random import random
 
-collection = LmdbCollection('http_test')
+# collection = LmdbCollection('conjure-test')
+collection = LocalCollectionWithBackup(
+    local_path='conjure-test',
+    remote_bucket='conjure-test',
+    is_public=True,
+    local_backup=False,
+    cors_enabled=True
+)
 
 
 @numpy_conjure(collection)

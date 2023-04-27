@@ -678,16 +678,6 @@ class SeriesView {
   }
 }
 
-const attachDataList = (parentId, data, itemElementName, transform) => {
-  const parentElement = document.getElementById(parentId);
-  parentElement.innerHTML = "";
-  data.forEach((item) => {
-    const child = document.createElement(itemElementName);
-    const mutated = transform(item, child);
-    parentElement.appendChild(mutated);
-  });
-};
-
 const conjure = async (
   {
     element = null,
@@ -764,12 +754,25 @@ const conjure = async (
       const onlyNew = feed.filter((item) => item.timestamp !== feedOffset);
       console.log(`Checked feed and found ${onlyNew.length} new items`);
       if (onlyNew.length) {
+        const index = onlyNew.length - 1;
+        const { key, timestamp } = onlyNew[index];
+        element.id = `id-${key}`;
+        const origMetadata = JSON.parse(element.getAttribute("data-conjure"));
+        const parts = origMetadata.public_uri.split("/").slice(0, -1);
+        const newPublicUri = [...parts, key].join("/");
+
+        const newMetaData = {
+          ...origMetadata,
+          public_uri: newPublicUri,
+        };
+
+        element.setAttribute("data-conjure", JSON.stringify(newMetaData));
         clearInterval(interval);
         await conjure({
           element,
-          metaData,
+          newMetaData,
           refreshRate,
-          feedOffset: onlyNew.slice(-1)[0].timestamp,
+          feedOffset: timestamp,
         });
       }
     }, refreshRate);
@@ -780,60 +783,8 @@ document.addEventListener(
   "DOMContentLoaded",
   async () => {
     conjure({
-      refreshRate: 5000
+      refreshRate: 5000,
     });
-    
-    // TODO: This is dumb.  This entire script should be separate,
-    // or even generated server-side
-    // if (!window.location.href.includes("dashboard")) {
-    //   conjure();
-    //   return;
-    // }
-
-    // TODO: Display the latest items from each function's feed,
-    // all at once
-
-    // list the functions
-    // const data = await fetch("/functions").then((resp) => resp.json());
-
-    // attachDataList("functions", data, "li", (d, c) => {
-    //   c.innerText = `${d.name} - ${d.content_type}`;
-
-    //   const preElement = document.createElement("pre");
-    //   preElement.innerText = d.code;
-    //   c.appendChild(preElement);
-
-    //   c.addEventListener("click", async () => {
-    //     // first, clear the display
-    //     const display = document.getElementById("display");
-    //     display.innerHTML = "";
-
-    //     // TODO: Get the most recent key from the feed, only display
-    //     // that key, and set it to auto-refresh
-
-    //     // when a function is clicked, list its keys
-    //     const { keys } = await fetch(d.url).then((resp) => resp.json());
-
-    //     // create elements for each of the keys
-    //     attachDataList("keys", keys, "div", (key, div) => {
-    //       div.id = `id-${key}`;
-    //       div.setAttribute(
-    //         "data-conjure",
-    //         JSON.stringify({
-    //           key,
-    //           feed_uri: `/feed/${d.id}`,
-    //           public_uri: `/functions/${d.id}/${key}`,
-    //           content_type: d.content_type,
-    //         })
-    //       );
-    //       return div;
-    //     });
-
-    //     // hydrate all the conjure elements
-    //     await conjure();
-    //   });
-    //   return c;
-    // });
   },
   false
 );

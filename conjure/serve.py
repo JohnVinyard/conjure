@@ -100,7 +100,10 @@ class Dashboard(object):
 
     def _item_html(self, conjure: Conjure) -> str:
         meta = conjure.most_recent_meta()
-        meta = meta.with_public_uri(self._uri(conjure, meta.key))
+
+        if not meta.public_uri:
+            meta = meta.with_public_uri(self._uri(conjure, meta.key))
+        
         html = meta.conjure_html()
         return html
 
