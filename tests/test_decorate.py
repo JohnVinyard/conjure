@@ -8,11 +8,11 @@ from random import random
 
 from traitlets import Callable
 
-from conjure.decorate import Conjure, WriteNotification, json_conjure
+from conjure.decorate import Conjure, WriteNotification, conjure_index, json_conjure, text_conjure
 from conjure.identifier import LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import JSONDeserializer, JSONSerializer
 from conjure.serve import serve_conjure
-from conjure.storage import LmdbCollection
+from conjure.storage import LmdbCollection, ensure_str
 from uuid import uuid4 as v4
 
 
@@ -268,3 +268,38 @@ class DecorateTests(TestCase):
         retrieved = make_bigger({'a': 10, 'b': 3})
         self.assertEqual(retrieved['a_bigger'], 100)
         self.assertIn('__deserialized', retrieved)
+    
+
+    def test_can_index_and_search(self):
+        
+        content = {
+            'a': 'lights in the sky',
+            'b': 'look to the sky'
+        }
+
+        @conjure_index(self.db.index_storage('content_index'))
+        def content_index(key: bytes, result: str, *args, **kwargs):
+            words = result.split()
+            for word in words:
+                yield word.lower(), dict(key=ensure_str(key))
+
+        @text_conjure(self.db, indexes=[content_index])
+        def fetch_content(key):
+            return content[key]
+        
+        
+        fetch_content('a')
+        fetch_content('b')
+
+
+        results = fetch_content.search('content_index', 'sky')
+        self.assertEqual(2, len(results))
+        
+
+        results = fetch_content.search('content_index', 'lights')
+        self.assertEqual(1, len(results))
+
+
+
+
+    

@@ -1,3 +1,4 @@
+from os import PathLike
 from typing import Callable, Iterable, Union
 from urllib.parse import ParseResult, urlparse
 import lmdb
@@ -9,6 +10,7 @@ from conjure.timestamp import timestamp_id
 def get_account_id():
     client = boto3.client("sts")
     return client.get_caller_identity()["Account"]
+
 
 def ensure_bytes(value: Union[str, bytes, memoryview]) -> bytes:
     if isinstance(value, memoryview):
@@ -100,11 +102,11 @@ class S3Collection(Collection):
                 Bucket=self.bucket,
                 ObjectOwnership='ObjectWriter')
             self.client.delete_public_access_block(
-                Bucket=self.bucket, 
+                Bucket=self.bucket,
                 ExpectedBucketOwner=get_account_id())
             self.client.put_bucket_acl(
-                Bucket=self.bucket, 
-                ACL=self.acl, 
+                Bucket=self.bucket,
+                ACL=self.acl,
                 ExpectedBucketOwner=get_account_id())
         except self.client.exceptions.BucketAlreadyExists:
             pass
@@ -173,13 +175,20 @@ class S3Collection(Collection):
 
 
 class LmdbCollection(Collection):
-    def __init__(self, path, extract_base_key: Callable[[bytes], bytes] = None):
+    def __init__(
+            self,
+            path: PathLike,
+            extract_base_key: Callable[[bytes], bytes] = None,
+            default_database_name: str = 'data',
+            build_feed:bool = True):
+
         super().__init__()
 
         # KLUDGE: Delimiter is configurable elsewhere, so this might cause problems
         self.extract_base_key = extract_base_key or (
             lambda x: ensure_bytes(ensure_str(x).split('_')[0]))
         self.path = path
+        self.build_feed = build_feed
         self.env = lmdb.open(
             self.path,
             max_dbs=10,
@@ -188,14 +197,27 @@ class LmdbCollection(Collection):
             map_async=True,
             metasync=True,
             lock=False)
-        self._data = self.env.open_db(b'data')
-        self._feed = self.env.open_db(b'feed')
+        self._default_database_name = ensure_bytes(default_database_name)
+        self._data = self.env.open_db(self._default_database_name)
+
+        if self.build_feed:
+            self._feed = self.env.open_db(b'feed')
+    
+    def index_storage(self, name):
+        return LmdbCollection(
+            self.path, 
+            self.extract_base_key, 
+            default_database_name=name, 
+            build_feed=False)
 
     def destroy(self):
         self.env.close()
         rmtree(self.path)
 
     def feed(self, offset: Union[bytes, str] = None):
+        if not self.build_feed:
+            raise NotImplementedError('This storage instance has no feed')
+        
         final_offset = offset or ''
         prefix = self.extract_base_key(ensure_bytes(final_offset))
 
@@ -255,11 +277,14 @@ class LmdbCollection(Collection):
         with self.env.begin(write=True, buffers=True, db=self._data) as txn:
             key = ensure_bytes(key)
             txn.put(key, ensure_bytes(value))
-            timestamp = timestamp_id()
-            base_key = self.extract_base_key(key)
-            feed_key = ensure_bytes(
-                f'{base_key.decode()}_{timestamp.decode()}')
-            txn.put(feed_key, key, db=self._feed)
+
+            if self.build_feed:
+                timestamp = timestamp_id()
+                base_key = self.extract_base_key(key)
+                feed_key = ensure_bytes(
+                    f'{base_key.decode()}_{timestamp.decode()}')
+                txn.put(feed_key, key, db=self._feed)
+
 
     def __getitem__(self, key):
         with self.env.begin(buffers=True, write=False, db=self._data) as txn:

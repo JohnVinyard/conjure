@@ -1,17 +1,73 @@
 import datetime
 import json
-from typing import Callable, Union
+from types import FunctionType
+from typing import Any, Callable, Iterable, List, Set, Tuple, Union
 from urllib.parse import ParseResult
 from conjure.contenttype import SupportedContentType
 from conjure.identifier import \
-    FunctionContentIdentifier, FunctionIdentifier, LiteralFunctionIdentifier, \
-    LiteralParamsIdentifier, ParamsHash, ParamsIdentifier
+    FunctionContentIdentifier, FunctionIdentifier, LiteralParamsIdentifier, \
+    ParamsHash, ParamsIdentifier
 from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
-from conjure.storage import Collection, LocalCollectionWithBackup, ensure_str
+from conjure.storage import Collection, LocalCollectionWithBackup, ensure_bytes, ensure_str
 import inspect
 from urllib.parse import urlunparse
+from collections import defaultdict
+
+
+class Index(object):
+    def __init__(
+            self,
+            name: str,
+            collection: Collection,
+            func: FunctionType,
+            serializer: Serializer = JSONSerializer(),
+            deserializer: Deserializer = JSONDeserializer()):
+
+        super().__init__()
+        self.func = func
+        self.name = name
+        self.serializer = serializer
+        self.deserializer = deserializer
+        self.collection = collection
+
+    def extract_key(self, data):
+        return data['key']
+    
+    def extract_and_store(self, key, result, *args, **kwargs):
+        for key, value in self.extract(key, result, *args, **kwargs):
+            k = ensure_bytes(key)
+            self.collection[k] = self.serializer.to_bytes(value)
+
+    def extract(self, key, result, *args, **kwargs) -> Iterable[Tuple[Union[str, bytes], Any]]:
+        results = self.func(key, result, *args, **kwargs)
+        for key, value in results:
+            if not self.extract_key(value):
+                raise ValueError('Could not extract key')
+            yield key, value
+    
+    def search(self, query: Union[str, bytes]):
+        values = []
+
+        for key in self.collection.iter_prefix(query, query):
+            raw_value = self.collection[key]
+            value = self.deserializer.from_bytes(raw_value)
+            values.append(value)
+        
+        return self.compact(values)
+
+    def compact(self, results):
+        """
+        Since the key may appear multiple times, rank by "relevance"
+        """
+        grouped = defaultdict(list)
+        for result in results:
+            key = result['key']
+            grouped[key].append(result)
+
+        srt = sorted(grouped.items(), key=lambda k, v: len(v), reverse=True)
+        return list(zip(*srt))[0]
 
 
 class MetaData(object):
@@ -94,7 +150,8 @@ class Conjure(object):
             serializer: Serializer,
             deserializer: Deserializer,
             key_delimiter='_',
-            prefer_cache=True):
+            prefer_cache=True,
+            indexes: List[Index] = None):
 
         super().__init__()
         self.callable = callable
@@ -106,6 +163,7 @@ class Conjure(object):
         self.serializer = serializer
         self.deserializer = deserializer
         self.prefer_cache = prefer_cache
+        self.indexes = {index.name: index for index in (indexes or [])}
 
         self.listeners = []
 
@@ -115,6 +173,10 @@ class Conjure(object):
             raise ValueError(
                 f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
+
+    def search(self, index_name: str, query: Union[str, bytes]):
+        index = self.indexes[index_name]
+        return index.search(query)
 
     def most_recent_key(self) -> str:
         all_keys = list(self.feed())
@@ -205,8 +267,15 @@ class Conjure(object):
         obj = self.callable(*args, **kwargs)
         raw = self.serializer.to_bytes(obj)
         self.storage.put(key, raw, self.content_type)
+
+        # index the results
+        for _, index in self.indexes.items():
+            index.extract_and_store(key, obj, *args, **kwargs)
+
+        # notify listeners
         for listener in self.listeners:
             listener(WriteNotification(key))
+        
         return obj
 
     def __call__(self, *args, **kwargs):
@@ -223,6 +292,22 @@ class Conjure(object):
             return self._compute_and_store(key, *args, **kwargs)
 
 
+def conjure_index(collection: Collection, name: str = None):
+
+    def deco(f: Callable):
+
+        n = name or f.__name__
+
+        return Index(
+            name=n,
+            collection=collection,
+            func=f, 
+            serializer=JSONSerializer(),
+            deserializer=JSONDeserializer())
+
+    return deco
+
+
 def conjure(
         content_type: str,
         storage: Collection,
@@ -231,7 +316,8 @@ def conjure(
         serializer: Serializer,
         deserializer: Deserializer,
         key_delimiter='_',
-        prefer_cache=True):
+        prefer_cache=True,
+        indexes=None):
 
     def deco(f: Callable):
         return Conjure(
@@ -243,13 +329,27 @@ def conjure(
             serializer=serializer,
             deserializer=deserializer,
             key_delimiter=key_delimiter,
-            prefer_cache=prefer_cache
+            prefer_cache=prefer_cache,
+            indexes=indexes
         )
 
     return deco
 
 
-def json_conjure(storage: Collection, tag_deserialized=False):
+def text_conjure(storage: Collection, indexes=None):
+
+    return conjure(
+        content_type=SupportedContentType.Text.value,
+        storage=storage,
+        func_identifier=FunctionContentIdentifier(),
+        param_identifier=ParamsHash(),
+        serializer=IdentitySerializer(),
+        deserializer=IdentityDeserializer(),
+        indexes=indexes
+    )
+
+
+def json_conjure(storage: Collection, tag_deserialized=False, indexes=None):
 
     return conjure(
         content_type='application/json',
@@ -257,11 +357,12 @@ def json_conjure(storage: Collection, tag_deserialized=False):
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
         serializer=JSONSerializer(),
-        deserializer=JSONDeserializer(tag_deserialized=tag_deserialized)
+        deserializer=JSONDeserializer(tag_deserialized=tag_deserialized),
+        indexes=indexes
     )
 
 
-def numpy_conjure(storage: Collection, content_type=SupportedContentType.Tensor.value):
+def numpy_conjure(storage: Collection, content_type=SupportedContentType.Tensor.value, indexes=None):
 
     return conjure(
         content_type=content_type,
@@ -269,11 +370,12 @@ def numpy_conjure(storage: Collection, content_type=SupportedContentType.Tensor.
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
         serializer=NumpySerializer(),
-        deserializer=NumpyDeserializer()
+        deserializer=NumpyDeserializer(),
+        indexes=indexes
     )
 
 
-def audio_conjure(storage: Collection):
+def audio_conjure(storage: Collection, indexes=None):
 
     return conjure(
         content_type=SupportedContentType.Audio.value,
@@ -281,11 +383,12 @@ def audio_conjure(storage: Collection):
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
         serializer=IdentitySerializer(),
-        deserializer=IdentityDeserializer()
+        deserializer=IdentityDeserializer(),
+        indexes=indexes
     )
 
 
-def time_series_conjure(storage: Collection, name: bytes):
+def time_series_conjure(storage: Collection, name: bytes, indexes=None):
 
     return conjure(
         content_type=SupportedContentType.TimeSeries.value,
@@ -294,5 +397,6 @@ def time_series_conjure(storage: Collection, name: bytes):
         param_identifier=LiteralParamsIdentifier(name),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),
-        prefer_cache=False
+        prefer_cache=False,
+        indexes=indexes
     )

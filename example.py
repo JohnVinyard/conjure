@@ -6,6 +6,7 @@ from time import sleep
 from threading import Thread
 from random import random
 
+
 # collection = LmdbCollection('conjure-test')
 collection = LocalCollectionWithBackup(
     local_path='conjure-test',
