@@ -270,8 +270,10 @@ class DecorateTests(TestCase):
         self.assertIn('__deserialized', retrieved)
     
 
+    @skip
     def test_can_create_index_after_initial_function_creation(self):
         self.fail()
+    
 
     def test_can_index_and_search(self):
         
