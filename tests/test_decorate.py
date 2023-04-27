@@ -270,6 +270,9 @@ class DecorateTests(TestCase):
         self.assertIn('__deserialized', retrieved)
     
 
+    def test_can_create_index_after_initial_function_creation(self):
+        self.fail()
+
     def test_can_index_and_search(self):
         
         content = {
@@ -298,6 +301,39 @@ class DecorateTests(TestCase):
 
         results = fetch_content.search('content_index', 'lights')
         self.assertEqual(1, len(results))
+
+    def test_can_index_and_rank_by_relevance(self):
+        
+        content = {
+            'a': 'lights in the sky',
+            'b': 'look to the sky',
+            'c': 'I look at the sky and the sky looks at me'
+        }
+
+        @conjure_index(self.db.index_storage('content_index'))
+        def content_index(key: bytes, result: str, *args, **kwargs):
+            words = result.split()
+            for word in words:
+                yield word.lower(), dict(key=ensure_str(key), content=result)
+
+        @text_conjure(self.db, indexes=[content_index])
+        def fetch_content(key):
+            return content[key]
+        
+        
+        fetch_content('a')
+        fetch_content('b')
+        fetch_content('c')
+
+
+        results = fetch_content.search('content_index', 'sky')
+        self.assertEqual(3, len(results))
+        best = results[0]
+
+        
+        self.assertEqual(content['c'], best['content'])
+        
+
 
 
 

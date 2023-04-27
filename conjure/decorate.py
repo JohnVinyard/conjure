@@ -13,8 +13,8 @@ from conjure.serialize import \
 from conjure.storage import Collection, LocalCollectionWithBackup, ensure_bytes, ensure_str
 import inspect
 from urllib.parse import urlunparse
-from collections import defaultdict
-
+from collections import defaultdict, Counter
+from uuid import uuid4
 
 class Index(object):
     def __init__(
@@ -34,11 +34,18 @@ class Index(object):
 
     def extract_key(self, data):
         return data['key']
-    
+
+    @property
+    def content_type(self):
+        return 'application/json'
+
     def extract_and_store(self, key, result, *args, **kwargs):
         for key, value in self.extract(key, result, *args, **kwargs):
-            k = ensure_bytes(key)
-            self.collection[k] = self.serializer.to_bytes(value)
+            k = ensure_str(key)
+            params = uuid4().hex
+            full_key = f'{k}_{params}'
+            self.collection.put(
+                ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
 
     def extract(self, key, result, *args, **kwargs) -> Iterable[Tuple[Union[str, bytes], Any]]:
         results = self.func(key, result, *args, **kwargs)
@@ -46,7 +53,7 @@ class Index(object):
             if not self.extract_key(value):
                 raise ValueError('Could not extract key')
             yield key, value
-    
+
     def search(self, query: Union[str, bytes]):
         values = []
 
@@ -54,20 +61,23 @@ class Index(object):
             raw_value = self.collection[key]
             value = self.deserializer.from_bytes(raw_value)
             values.append(value)
-        
+
         return self.compact(values)
 
     def compact(self, results):
         """
         Since the key may appear multiple times, rank by "relevance"
         """
-        grouped = defaultdict(list)
+
+        indexed = {r['key']: r for r in results}
+
+        counter = Counter()
         for result in results:
             key = result['key']
-            grouped[key].append(result)
+            counter[key] += 1
 
-        srt = sorted(grouped.items(), key=lambda k, v: len(v), reverse=True)
-        return list(zip(*srt))[0]
+        srt = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+        return [indexed[k[0]] for k in srt]
 
 
 class MetaData(object):
@@ -275,7 +285,7 @@ class Conjure(object):
         # notify listeners
         for listener in self.listeners:
             listener(WriteNotification(key))
-        
+
         return obj
 
     def __call__(self, *args, **kwargs):
@@ -301,7 +311,7 @@ def conjure_index(collection: Collection, name: str = None):
         return Index(
             name=n,
             collection=collection,
-            func=f, 
+            func=f,
             serializer=JSONSerializer(),
             deserializer=JSONDeserializer())
 

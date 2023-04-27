@@ -198,6 +198,7 @@ class LmdbCollection(Collection):
             metasync=True,
             lock=False)
         self._default_database_name = ensure_bytes(default_database_name)
+        print(f'LmdbCollection {self._default_database_name}')
         self._data = self.env.open_db(self._default_database_name)
 
         if self.build_feed:
