@@ -13,7 +13,7 @@ from conjure.serialize import \
 from conjure.storage import Collection, LocalCollectionWithBackup, ensure_bytes, ensure_str
 import inspect
 from urllib.parse import urlunparse
-from collections import defaultdict, Counter
+from collections import Counter
 from uuid import uuid4
 
 class Index(object):
@@ -40,10 +40,27 @@ class Index(object):
         return 'application/json'
 
     def extract_and_store(self, key, result, *args, **kwargs):
-        for key, value in self.extract(key, result, *args, **kwargs):
+        document_key = key
+
+        for i, pair in enumerate(self.extract(key, result, *args, **kwargs)):
+            key, value = pair
+
             k = ensure_str(key)
-            params = uuid4().hex
-            full_key = f'{k}_{params}'
+            # TODO: If this were deterministic, then it would be safe to fully
+            # re-index and I wouldn't need to worry about storing a feed offset
+            # for each index (yet). If it doesn't have the additional segment at
+            # the end, then duplicate keys are overwritten (i.e., can't store the
+            # same word pointing to different documents)
+            #
+            # Maybe this should just be sequential?
+            # params = uuid4().hex
+
+            # NOTE: The assumption here is that index keys are extracted 
+            # from the document in an ordered, deterministic way
+            full_key = f'{k}_{ensure_str(document_key)}_{hex(i)}'
+
+            # TODO: Here I need to make sure that the feed key is written to the 
+            # offset value for this database
             self.collection.put(
                 ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
 
