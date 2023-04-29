@@ -245,7 +245,8 @@ class Index(object):
             conjure: Conjure,
             func: FunctionType,
             serializer: Serializer = JSONSerializer(),
-            deserializer: Deserializer = JSONDeserializer()):
+            deserializer: Deserializer = JSONDeserializer(),
+            register_listener=True):
 
         super().__init__()
         self.func = func
@@ -254,9 +255,11 @@ class Index(object):
         self.deserializer = deserializer
         self.conjure = conjure
         self.collection = collection
-        self.conjure.register_listener(
-            lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
-    
+        if register_listener:
+            self.conjure.register_listener(
+                lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
+        
+        self.keys_processed_in_current_session = 0
 
     @property
     def offset(self):
@@ -278,7 +281,6 @@ class Index(object):
         return 'application/json'
 
     def extract_and_store(self, key, result, *args, **kwargs):
-        print(key,result)
         document_key = key
 
         for i, pair in enumerate(self.extract(key, result, *args, **kwargs)):
@@ -294,6 +296,9 @@ class Index(object):
             # offset value for this database
             self.collection.put(
                 ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
+        
+        self.collection.set_offset(document_key)
+        self.keys_processed_in_current_session += 1
 
     def extract(self, key, result, *args, **kwargs) -> Iterable[Tuple[Union[str, bytes], Any]]:
         results = self.func(key, result, *args, **kwargs)

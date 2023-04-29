@@ -51,6 +51,13 @@ class Collection(object):
     def feed(self, offset: Union[bytes, str] = None):
         raise NotImplementedError()
     
+    @property
+    def offset(self):
+        raise NotImplementedError()
+    
+    def set_offset(self, offset):
+        raise NotImplementedError()
+    
 
 class S3Collection(Collection):
 
@@ -62,6 +69,13 @@ class S3Collection(Collection):
         self.cors_enabled = cors_enabled
 
         self._create_bucket()
+    
+    @property
+    def offset(self):
+        raise NotImplementedError()
+    
+    def set_offset(self, offset):
+        raise NotImplementedError()
 
     def public_uri(self, key: Union[bytes, str]):
         if not self.is_public:
@@ -199,11 +213,25 @@ class LmdbCollection(Collection):
             lock=False)
         self._default_database_name = ensure_bytes(default_database_name)
         self._data = self.env.open_db(self._default_database_name)
-
+        self._offsets = self.env.open_db(b'offsets')
 
         if self.build_feed:
             self._feed = self.env.open_db(b'feed')
 
+    @property
+    def offset(self):
+        with self.env.begin(write=False, db=self._offsets) as txn:
+            offset = txn.get(self._default_database_name, db=self._offsets)
+            return offset
+    
+    def set_offset(self, offset, txn=None):
+        if txn:
+            offset = txn.put(self._default_database_name, offset, db=self._offsets)
+            return offset
+        
+        with self.env.begin(write=True, db=self._offsets) as txn:
+            offset = txn.put(self._default_database_name, offset, db=self._offsets)
+            return offset
     
     def index_storage(self, name):
         return LmdbCollection(
@@ -286,6 +314,7 @@ class LmdbCollection(Collection):
                 feed_key = ensure_bytes(
                     f'{base_key.decode()}_{timestamp.decode()}')
                 txn.put(feed_key, key, db=self._feed)
+                self.set_offset(key, txn=txn)
 
 
     def __getitem__(self, key):
@@ -317,7 +346,14 @@ class LocalCollectionWithBackup(Collection):
         else:
             self._remote = S3Collection(
                 remote_bucket, is_public=is_public, cors_enabled=cors_enabled)
-
+    
+    @property
+    def offset(self):
+        return self._local.offset
+    
+    def set_offset(self, offset):
+        self._local.set_offset(offset)
+    
     def feed(self, offset: Union[bytes, str] = None):
         return self._local.feed(offset)
 
