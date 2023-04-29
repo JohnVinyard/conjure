@@ -1,7 +1,7 @@
 import datetime
 import json
 from types import FunctionType
-from typing import Any, Callable, Iterable, List, Set, Tuple, Union
+from typing import Any, Callable, Iterable, Tuple, Union
 from urllib.parse import ParseResult
 from conjure.contenttype import SupportedContentType
 from conjure.identifier import \
@@ -14,7 +14,6 @@ from conjure.storage import Collection, LocalCollectionWithBackup, ensure_bytes,
 import inspect
 from urllib.parse import urlunparse
 from collections import Counter
-from uuid import uuid4
 
 
 class MetaData(object):
@@ -101,7 +100,6 @@ class Conjure(object):
             deserializer: Deserializer,
             key_delimiter='_',
             prefer_cache=True,
-            # indexes: List[Index] = None
         ):
 
         super().__init__()
@@ -114,7 +112,6 @@ class Conjure(object):
         self.serializer = serializer
         self.deserializer = deserializer
         self.prefer_cache = prefer_cache
-        # self.indexes = {index.name: index for index in (indexes or [])}
 
         self.listeners = []
 
@@ -124,10 +121,6 @@ class Conjure(object):
             raise ValueError(
                 f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
-
-    # def search(self, index_name: str, query: Union[str, bytes]):
-    #     index = self.indexes[index_name]
-    #     return index.search(query)
 
     def most_recent_key(self) -> str:
         all_keys = list(self.feed())
@@ -224,10 +217,6 @@ class Conjure(object):
         raw = self.serializer.to_bytes(obj)
         self.storage.put(key, raw, self.content_type)
 
-        # index the results
-        # for _, index in self.indexes.items():
-        #     index.extract_and_store(key, obj, *args, **kwargs)
-
         # notify listeners
         for listener in self.listeners:
             listener(WriteNotification(key, obj, *args, **kwargs))
@@ -265,9 +254,6 @@ class Index(object):
         self.deserializer = deserializer
         self.conjure = conjure
         self.collection = collection
-
-        # TODO: create my own collection and add myself as a listener
-        # to the conjure that's passed in
         self.conjure.register_listener(
             lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
     
@@ -277,7 +263,7 @@ class Index(object):
         return None
 
     def index(self):
-        for item in self.conjure.feed():
+        for item in self.conjure.feed(offset=self.offset):
             key = item['key']
             obj = self.conjure.get(key)
             # TODO: What if I need to partially/fuly reconstruct the
@@ -299,14 +285,6 @@ class Index(object):
             key, value = pair
 
             k = ensure_str(key)
-            # TODO: If this were deterministic, then it would be safe to fully
-            # re-index and I wouldn't need to worry about storing a feed offset
-            # for each index (yet). If it doesn't have the additional segment at
-            # the end, then duplicate keys are overwritten (i.e., can't store the
-            # same word pointing to different documents)
-            #
-            # Maybe this should just be sequential?
-            # params = uuid4().hex
 
             # NOTE: The assumption here is that index keys are extracted 
             # from the document in an ordered, deterministic way
