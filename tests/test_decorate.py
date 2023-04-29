@@ -87,7 +87,8 @@ class DecorateTests(TestCase):
             [make_bigger], port=9999, n_workers=1, revive=False)
 
         def get_keys_over_http():
-            resp = requests.get(f'http://localhost:9999/functions/{make_bigger.identifier}', verify=False)
+            resp = requests.get(
+                f'http://localhost:9999/functions/{make_bigger.identifier}', verify=False)
             keys = resp.json()['keys']
             self.assertEqual(2, len(keys))
 
@@ -130,7 +131,6 @@ class DecorateTests(TestCase):
         self.assertEqual(2, len(bigger_keys))
 
         self.assertEqual(3, len(smaller_keys))
-    
 
     def test_feeds_are_segregated_when_storage_is_shared(self):
         @json_conjure(self.db)
@@ -161,7 +161,6 @@ class DecorateTests(TestCase):
 
         self.assertEqual(2, len(bigger_feed))
         self.assertEqual(3, len(smaller_feed))
-    
 
     def test_can_get_most_recent_key(self):
         @json_conjure(self.db)
@@ -189,7 +188,8 @@ class DecorateTests(TestCase):
 
         smaller_feed = list(make_smaller.feed())
 
-        self.assertEqual(make_smaller.most_recent_key(), smaller_feed[-1]['key'])
+        self.assertEqual(make_smaller.most_recent_key(),
+                         smaller_feed[-1]['key'])
 
     def test_can_register_listener(self):
         @json_conjure(self.db)
@@ -268,76 +268,90 @@ class DecorateTests(TestCase):
         retrieved = make_bigger({'a': 10, 'b': 3})
         self.assertEqual(retrieved['a_bigger'], 100)
         self.assertIn('__deserialized', retrieved)
-    
 
-    @skip
     def test_can_create_index_after_initial_function_creation(self):
-        self.fail()
-    
-
-    def test_can_index_and_search(self):
-        
-        content = {
-            'a': 'lights in the sky',
-            'b': 'look to the sky'
-        }
-
-        @conjure_index(self.db.index_storage('content_index'))
-        def content_index(key: bytes, result: str, *args, **kwargs):
-            words = result.split()
-            for word in words:
-                yield word.lower(), dict(key=ensure_str(key))
-
-        @text_conjure(self.db, indexes=[content_index])
-        def fetch_content(key):
-            return content[key]
-        
-        
-        fetch_content('a')
-        fetch_content('b')
-
-
-        results = fetch_content.search('content_index', 'sky')
-        self.assertEqual(2, len(results))
-        
-
-        results = fetch_content.search('content_index', 'lights')
-        self.assertEqual(1, len(results))
-
-    def test_can_index_and_rank_by_relevance(self):
-        
         content = {
             'a': 'lights in the sky',
             'b': 'look to the sky',
             'c': 'I look at the sky and the sky looks at me'
         }
 
-        @conjure_index(self.db.index_storage('content_index'))
-        def content_index(key: bytes, result: str, *args, **kwargs):
-            words = result.split()
-            for word in words:
-                yield word.lower(), dict(key=ensure_str(key), content=result)
-
-        @text_conjure(self.db, indexes=[content_index])
+        @text_conjure(self.db)
         def fetch_content(key):
             return content[key]
-        
         
         fetch_content('a')
         fetch_content('b')
         fetch_content('c')
 
 
-        results = fetch_content.search('content_index', 'sky')
+        @conjure_index(fetch_content, self.db.index_storage('content_index'))
+        def content_index(key: bytes, result: str, *args, **kwargs):
+            words = result.split()
+            for word in words:
+                yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
+        
+
+        content_index.index()
+        
+        results = content_index.search('sky')
         self.assertEqual(3, len(results))
         best = results[0]
 
-        
         self.assertEqual(content['c'], best['content'])
+
+
+    def test_can_index_and_search(self):
+
+        content = {
+            'a': 'lights in the sky',
+            'b': 'look to the sky'
+        }
+
+        @text_conjure(self.db)
+        def fetch_content(key):
+            return content[key]
+
+        @conjure_index(fetch_content, self.db.index_storage('content_index'))
+        def content_index(key: bytes, result: str, *args, **kwargs):
+            words = result.split()
+            for word in words:
+                yield word.lower(), dict(key=ensure_str(key))
+
+        fetch_content('a')
+        fetch_content('b')
+
+        results = content_index.search('sky')
+        self.assertEqual(2, len(results))
+
+        results = content_index.search('lights')
+        self.assertEqual(1, len(results))
+
+    def test_can_index_and_rank_by_relevance(self):
+
+        content = {
+            'a': 'lights in the sky',
+            'b': 'look to the sky',
+            'c': 'I look at the sky and the sky looks at me'
+        }
+
+        @text_conjure(self.db)
+        def fetch_content(key):
+            return content[key]
+
+        @conjure_index(fetch_content, self.db.index_storage('content_index'))
+        def content_index(key: bytes, result: str, *args, **kwargs):
+            words = result.split()
+            for word in words:
+                yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
         
 
+        fetch_content('a')
+        fetch_content('b')
+        fetch_content('c')
 
+        results = content_index.search('sky')
+        self.assertEqual(3, len(results))
+        best = results[0]
 
-
-
-    
+        self.assertEqual(content['c'], best['content'])

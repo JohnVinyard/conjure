@@ -50,7 +50,7 @@ class Collection(object):
 
     def feed(self, offset: Union[bytes, str] = None):
         raise NotImplementedError()
-
+    
 
 class S3Collection(Collection):
 
