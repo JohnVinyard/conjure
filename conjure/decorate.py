@@ -90,17 +90,17 @@ WriteListener = Callable[[WriteNotification], None]
 class Conjure(object):
 
     def __init__(
-            self,
-            callable: Callable,
-            content_type: str,
-            storage: Collection,
-            func_identifier: FunctionIdentifier,
-            param_identifier: ParamsIdentifier,
-            serializer: Serializer,
-            deserializer: Deserializer,
-            key_delimiter='_',
-            prefer_cache=True,
-        ):
+        self,
+        callable: Callable,
+        content_type: str,
+        storage: Collection,
+        func_identifier: FunctionIdentifier,
+        param_identifier: ParamsIdentifier,
+        serializer: Serializer,
+        deserializer: Deserializer,
+        key_delimiter='_',
+        prefer_cache=True,
+    ):
 
         super().__init__()
         self.callable = callable
@@ -114,10 +114,17 @@ class Conjure(object):
         self.prefer_cache = prefer_cache
 
         self.listeners = []
+    
+    @property
+    def offset(self):
+        return self.storage.offset
 
     def feed(self, offset: Union[bytes, str] = None):
         final_offset = offset or self.identifier
-        if not final_offset.startswith(self.identifier):
+
+        search = ensure_bytes(self.identifier) if isinstance(
+            final_offset, bytes) else ensure_str(self.identifier)
+        if not final_offset.startswith(search):
             raise ValueError(
                 f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
@@ -258,26 +265,26 @@ class Index(object):
         if register_listener:
             self.conjure.register_listener(
                 lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
-        
+
         self.keys_processed_in_current_session = 0
 
     @property
     def offset(self):
-        # For now, we'll fully re-index each time
-        return None
-        # if self.collection.offset is None:
-        #     return None
-        
-        # return ensure_bytes(self.collection.offset)
+        if self.collection.offset is None:
+            return None
+        return ensure_bytes(self.collection.offset)
 
     def index(self):
 
         for item in self.conjure.feed(offset=self.offset):
+            if self.offset == item['timestamp']:
+                continue
+            
             key = item['key']
             obj = self.conjure.get(key)
             # TODO: What if I need to partially/fuly reconstruct the
             # original arguments?
-            self.extract_and_store(key, obj)
+            self.extract_and_store(key, obj, feed_offset=item['timestamp'])
 
     def extract_key(self, data):
         return data['key']
@@ -286,7 +293,7 @@ class Index(object):
     def content_type(self):
         return 'application/json'
 
-    def extract_and_store(self, key, result, *args, **kwargs):
+    def extract_and_store(self, key, result, feed_offset = None, *args, **kwargs):
         document_key = key
 
         for i, pair in enumerate(self.extract(key, result, *args, **kwargs)):
@@ -294,15 +301,16 @@ class Index(object):
 
             k = ensure_str(key)
 
-            # NOTE: The assumption here is that index keys are extracted 
+            # NOTE: The assumption here is that index keys are extracted
             # from the document in an ordered, deterministic way
             full_key = f'{k}_{ensure_str(document_key)}_{hex(i)}'
 
             self.collection.put(
                 ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
-        
-        self.collection.set_offset(document_key)
-        self.keys_processed_in_current_session += 1
+
+        if feed_offset:
+            self.collection.set_offset(ensure_bytes(feed_offset))
+            self.keys_processed_in_current_session += 1
 
     def extract(self, key, result, *args, **kwargs) -> Iterable[Tuple[Union[str, bytes], Any]]:
         results = self.func(key, result, *args, **kwargs)
@@ -335,7 +343,6 @@ class Index(object):
 
         srt = sorted(counter.items(), key=lambda x: x[1], reverse=True)
         return [indexed[k[0]] for k in srt]
-
 
 
 def conjure_index(conjure: Conjure, collection: Collection, name: str = None):

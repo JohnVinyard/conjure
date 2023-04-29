@@ -327,7 +327,6 @@ class DecorateTests(TestCase):
         results = content_index.search('lights')
         self.assertEqual(1, len(results))
     
-    @skip
     def test_can_index_incrementally(self):
 
         content = {

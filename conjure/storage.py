@@ -314,7 +314,7 @@ class LmdbCollection(Collection):
                 feed_key = ensure_bytes(
                     f'{base_key.decode()}_{timestamp.decode()}')
                 txn.put(feed_key, key, db=self._feed)
-                self.set_offset(key, txn=txn)
+                self.set_offset(feed_key, txn=txn)
 
 
     def __getitem__(self, key):
