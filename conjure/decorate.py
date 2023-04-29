@@ -263,9 +263,15 @@ class Index(object):
 
     @property
     def offset(self):
+        # For now, we'll fully re-index each time
         return None
+        # if self.collection.offset is None:
+        #     return None
+        
+        # return ensure_bytes(self.collection.offset)
 
     def index(self):
+
         for item in self.conjure.feed(offset=self.offset):
             key = item['key']
             obj = self.conjure.get(key)
@@ -292,8 +298,6 @@ class Index(object):
             # from the document in an ordered, deterministic way
             full_key = f'{k}_{ensure_str(document_key)}_{hex(i)}'
 
-            # TODO: Here I need to make sure that the feed key is written to the 
-            # offset value for this database
             self.collection.put(
                 ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
         

@@ -8,7 +8,7 @@ from random import random
 
 from traitlets import Callable
 
-from conjure.decorate import Conjure, WriteNotification, conjure_index, json_conjure, text_conjure
+from conjure.decorate import Conjure, Index, WriteNotification, conjure_index, json_conjure, text_conjure
 from conjure.identifier import LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import JSONDeserializer, JSONSerializer
 from conjure.serve import serve_conjure
@@ -326,6 +326,43 @@ class DecorateTests(TestCase):
 
         results = content_index.search('lights')
         self.assertEqual(1, len(results))
+    
+    @skip
+    def test_can_index_incrementally(self):
+
+        content = {
+            'a': 'lights in the sky',
+            'b': 'look to the sky',
+            'c': 'I look at the sky and the sky looks at me'
+        }
+
+        @text_conjure(self.db)
+        def fetch_content(key):
+            return content[key]
+        
+
+        def content_index_func(key: bytes, result: str, *args, **kwargs):
+            words = result.split()
+            for word in words:
+                yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
+
+        content_index = Index(
+            name='content_index',
+            collection=self.db.index_storage('content_index'),
+            conjure=fetch_content,
+            register_listener=False,
+            func=content_index_func
+        )
+
+        fetch_content('a')
+        fetch_content('b')
+        content_index.index()
+        self.assertEqual(2, content_index.keys_processed_in_current_session)
+
+        fetch_content('c')
+        content_index.index()
+        self.assertEqual(3, content_index.keys_processed_in_current_session)
+
 
     def test_can_index_and_rank_by_relevance(self):
 
