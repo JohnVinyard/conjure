@@ -14,13 +14,22 @@
     <style>
       {style}
     </style>
+
+    <template id="function-detail">
+      <div>
+        <div>
+          <a href="/dashboard">home</a>
+        </div>
+        <h2 id="function-name"></h2>
+        <pre id="function-code"></pre>
+        <ul></ul>
+      </div>
+    </template>
   </head>
   <body>
     <header></header>
     <main>
-      <div class="container">
-        {items}
-      </div>
+      <div class="container">{items}</div>
     </main>
     <footer></footer>
   </body>

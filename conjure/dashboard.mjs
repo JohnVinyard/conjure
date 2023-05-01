@@ -678,6 +678,41 @@ class SeriesView {
   }
 }
 
+const renderView = async (fetchData, templateId, modifications) => {
+  const data = await fetchData();
+  console.log(data);
+
+  // Clear the main container
+  const element = document.querySelector(".container");
+  element.innerHTML = "";
+
+  // Get the template, clone it, mutate the clone and add to the document
+  const tmp = document.getElementById(templateId);
+  const clone = tmp.content.firstElementChild.cloneNode(true);
+
+  Object.entries(modifications).forEach(([selector, mutation]) => {
+    const elements = clone.querySelectorAll(selector);
+    elements.forEach((el) => mutation(data, el));
+  });
+
+  element.appendChild(clone);
+};
+
+const renderFunctionDetail = async (id) => {
+  renderView(
+    async () => fetch(`/functions/${id}`).then((resp) => resp.json()),
+    "function-detail",
+    {
+      "#function-name": (d, el) => {
+        el.innerHTML = d.name;
+      },
+      "#function-code": (d, el) => {
+        el.innerHTML = d.code;
+      },
+    }
+  );
+};
+
 const conjure = async (
   {
     element = null,
@@ -698,7 +733,14 @@ const conjure = async (
     return;
   }
 
-  const { key, public_uri, content_type, feed_uri } =
+  const {
+    key,
+    public_uri,
+    content_type,
+    feed_uri,
+    func_name,
+    func_identifier,
+  } =
     metaData === null
       ? JSON.parse(element.getAttribute("data-conjure"))
       : metaData;
@@ -730,6 +772,12 @@ const conjure = async (
   const container = document.createElement(rootElement);
   container.style.width = style.width;
   container.style.height = style.height;
+  container.addEventListener("click", async () => {
+    // await fetch(`/functions/${func_identifier}`)
+    //   .then((resp) => resp.json())
+    //   .then(console.log);
+    renderFunctionDetail(func_identifier);
+  });
   container.id = `display-${key}`;
   root.appendChild(container);
 

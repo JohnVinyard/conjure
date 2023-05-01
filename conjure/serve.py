@@ -14,6 +14,10 @@ MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class ListFunctions(object):
+    """
+    List all functions served by this server instance
+    """
+
     def __init__(self, functions: List[Conjure]):
         super().__init__()
         self.functions = {f.identifier: f for f in functions}
@@ -44,6 +48,7 @@ class Function(object):
                 'id': func.identifier,
                 'name': func.name,
                 'description': func.description or '',
+                'code': func.code,
                 'url': f'/functions/{func.identifier}',
                 'feed': f'/feed/{func.identifier}',
                 'keys': list(k.decode() for k in func.iter_keys())
@@ -79,7 +84,7 @@ class FunctionFeed(object):
         try:
             func = self.functions[identifier]
             offset = req.get_param('offset')
-            items = list(func.feed(offset)) # [{ timestamp, key }]
+            items = list(func.feed(offset))  # [{ timestamp, key }]
             res.media = list(
                 map(lambda x: {key: value.decode() for key, value in x.items()}, items))
             res.status = falcon.HTTP_OK
@@ -93,18 +98,19 @@ class Dashboard(object):
         super().__init__()
         self.conjure_funcs = {f.identifier: f for f in conjure_funcs}
         self.port = port
-    
+
     def _uri(self, conj: Conjure, key: Union[str, bytes]) -> ParseResult:
+        # TODO: host should not be hard coded here
         return urlparse(f'http://localhost:{self.port}/functions/{conj.identifier}/{ensure_str(key)}')
-    
 
     def _item_html(self, conjure: Conjure) -> str:
         meta = conjure.most_recent_meta()
 
         if not meta.public_uri:
             meta = meta.with_public_uri(self._uri(conjure, meta.key))
-        
+
         html = meta.conjure_html()
+
         return html
 
     def on_get(self, req: falcon.Request, res: falcon.Response):
@@ -121,7 +127,8 @@ class Dashboard(object):
         with open(os.path.join(MODULE_DIR, 'dashboard.html'), 'r') as f:
             content = f.read()
             res.content_length = len(content)
-            items = map(lambda x: self._item_html(x), self.conjure_funcs.values())
+            items = map(lambda x: self._item_html(x),
+                        self.conjure_funcs.values())
             res.body = content.format(
                 script=script,
                 imports=imports,
