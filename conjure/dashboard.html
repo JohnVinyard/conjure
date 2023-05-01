@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Conjure</title>
+
+    <link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/base16/dracula.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+
+
     <script type="importmap">
       {imports}
     </script>
@@ -15,16 +21,27 @@
       {style}
     </style>
 
+    <!-- function detail -->
     <template id="function-detail">
       <div>
         <div>
           <a href="/dashboard">home</a>
         </div>
-        <h2 id="function-name"></h2>
-        <pre id="function-code"></pre>
-        <ul></ul>
+        <h2><code id="function-name"></code></h2>
+        <p id="function-description"></p>
+        <pre><code id="function-code" class="language-python"></code></pre>
+        <ul id="recent-keys"></ul>
       </div>
     </template>
+
+    <!-- function detail - recent key -->
+    <template id="function-detail-recent-key">
+      <div>
+        <li></li>
+      </div>
+    </template>
+
+
   </head>
   <body>
     <header></header>

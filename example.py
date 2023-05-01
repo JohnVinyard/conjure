@@ -19,6 +19,10 @@ collection = LocalCollectionWithBackup(
 
 @numpy_conjure(collection)
 def spectral_magnitude(arr: np.ndarray):
+    """
+    Compute the spectral magnitude along the last dimension of 
+    an arbitrarily-sized tensor
+    """
     spec = np.fft.rfft(arr, axis=-1, norm='ortho')
     spec = np.abs(spec).astype(np.float32)
     return spec
@@ -31,6 +35,9 @@ d = {
 
 @time_series_conjure(collection, 'loss')
 def time_series():
+    """
+    Append values to a time series
+    """
     d['values'] = np.concatenate(
         [d['values'], np.random.uniform(0, 1, (2, 2)).astype(np.float32)], axis=-1)
     return d['values']

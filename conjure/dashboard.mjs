@@ -120,11 +120,6 @@ class World {
     this.elapsedTime = 0;
 
     this.sceneUpdater = null;
-
-    console.log(this.renderer.getContext().getExtension("OES_texture_float"));
-    console.log(
-      this.renderer.getContext().getExtension("OES_texture_float_linear")
-    );
   }
 
   get nChilidren() {
@@ -504,16 +499,6 @@ class TensorMovieView {
   }
 
   render() {
-    console.log(
-      `Setting up scene with ${TensorMovieView.name} and ${this.element.id}`
-    );
-
-    console.log(
-      "Tensor with max: ",
-      this.tensor.maxValue,
-      this.tensor.minValue
-    );
-
     // set up the world and store a reference
     const world = new World(this.element, [1, 0, 1]);
     this.world = world;
@@ -678,9 +663,10 @@ class SeriesView {
   }
 }
 
-const renderView = async (fetchData, templateId, modifications) => {
+const renderView = async (path, fetchData, templateId, modifications) => {
   const data = await fetchData();
-  console.log(data);
+
+  window.history.pushState({}, "", path(data));
 
   // Clear the main container
   const element = document.querySelector(".container");
@@ -696,10 +682,13 @@ const renderView = async (fetchData, templateId, modifications) => {
   });
 
   element.appendChild(clone);
+
+  hljs.highlightAll();
 };
 
 const renderFunctionDetail = async (id) => {
   renderView(
+    (data) => `/dashboard/functions/${data.id}`,
     async () => fetch(`/functions/${id}`).then((resp) => resp.json()),
     "function-detail",
     {
@@ -708,6 +697,21 @@ const renderFunctionDetail = async (id) => {
       },
       "#function-code": (d, el) => {
         el.innerHTML = d.code;
+      },
+      "#function-description": (d, el) => {
+        el.innerHTML = d.description;
+      },
+      // TODO: This is just a nested template
+      "#recent-keys": (d, el) => {
+        fetch(d.feed)
+          .then((resp) => resp.json())
+          .then((resp) => {
+            resp.slice(0, 10).forEach((k) => {
+              const li = document.createElement("li");
+              li.innerText = k.key;
+              el.appendChild(li);
+            });
+          });
       },
     }
   );
@@ -762,10 +766,6 @@ const conjure = async (
   const renderer = contentTypeToRenderClass[content_type];
   const rootElement = contentTypeToRootElementType[content_type];
 
-  console.log(
-    `conjuring with content-type: ${content_type}, class: ${renderer.name}, root element: ${rootElement.name}`
-  );
-
   const root = element;
   root.innerHTML = "";
 
@@ -773,9 +773,6 @@ const conjure = async (
   container.style.width = style.width;
   container.style.height = style.height;
   container.addEventListener("click", async () => {
-    // await fetch(`/functions/${func_identifier}`)
-    //   .then((resp) => resp.json())
-    //   .then(console.log);
     renderFunctionDetail(func_identifier);
   });
   container.id = `display-${key}`;
@@ -827,11 +824,15 @@ const conjure = async (
   }
 };
 
+window.addEventListener("popstate", async (event) => {
+  console.log("POPSTATE", event);
+});
+
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
     conjure({
-      refreshRate: 5000,
+      // refreshRate: 5000,
     });
   },
   false
