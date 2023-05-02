@@ -6,9 +6,8 @@ import multiprocessing
 import gunicorn.app.base
 import sys
 import os
-import json
 
-from conjure.storage import ensure_bytes, ensure_str
+from conjure.storage import ensure_str
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -21,17 +20,6 @@ class ListFunctions(object):
     def __init__(self, functions: List[Conjure]):
         super().__init__()
         self.functions = {f.identifier: f for f in functions}
-    
-    '''
-    conjure_data = {
-            'key': ensure_str(self.key),
-            'public_uri': urlunparse(self.public_uri),
-            'content_type': self.content_type,
-            'feed_uri': f'/feed/{ensure_str(self.identifier)}',
-            'func_name': self.func_name,
-            'func_identifier': self.func_identifier
-        }
-    '''
 
     def on_get(self, req: falcon.Request, res: falcon.Response):
         res.media = list(map(
@@ -125,7 +113,7 @@ class Dashboard(object):
 
         return html
 
-    def on_get(self, req: falcon.Request, res: falcon.Response):
+    def on_get(self, req: falcon.Request, res: falcon.Response, function_id=None):
 
         with open(os.path.join(MODULE_DIR, 'style.css'), 'r') as f:
             style = f.read()
@@ -159,7 +147,9 @@ class MutliFunctionApplication(falcon.API):
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',
                        FunctionResult(conjure_funcs))
+        
         self.add_route('/dashboard', Dashboard(conjure_funcs, port=port))
+        self.add_route('/dashboard/functions/{function_id}', Dashboard(conjure_funcs, port=port))
 
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):

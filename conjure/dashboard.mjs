@@ -710,8 +710,10 @@ const changeView = async (
   render,
   postRender = () => {}
 ) => {
-  window.history.pushState({}, "", path);
-  const data = await fetchData();
+  const pushPath = typeof path === "string" ? path : path.pathname;
+
+  window.history.pushState({}, "", pushPath);
+  const data = await fetchData(pushPath);
   render(rootElementSelector, data);
   postRender();
 };
@@ -742,7 +744,7 @@ class HomeURLPath extends URLPath {
    * @param {URL} url
    */
   static fromURL(url) {
-    const path = url.pathname;
+    const path = typeof url === "string" ? url : url.pathname;
     const segments = path.split("/").filter((segment) => segment.length);
     if (segments.length === 1 && segments[0] === "dashboard") {
       return new HomeURLPath();
@@ -765,8 +767,8 @@ class FunctioDetailUrlPath extends URLPath {
    * @param {URL} url
    */
   static fromURL(url) {
-    const path = url.pathname;
-    const segments = path.split("/");
+    const path = typeof url === "string" ? url : url.pathname;
+    const segments = path.split("/").filter((segment) => segment.length);
     if (
       segments.length === 3 &&
       segments[0] === "dashboard" &&
@@ -819,6 +821,7 @@ class FunctionDetailView extends View {
 
   async fetchData(url) {
     const instance = this.urlClass.fromURL(url);
+    console.log("FETCH DATA", url, instance);
     return fetchJSON(`/functions/${instance.functionId}`);
   }
 
@@ -875,7 +878,17 @@ const selectAndRenderView = async (url) => {
 
   changeView(
     selectedView.urlClass.fromURL(url).relativeUrl,
-    selectedView.fetchData,
+    selectedView.fetchData.bind(selectedView),
+    ".container",
+    selectedView.render.bind(selectedView),
+    selectedView.postRender.bind(selectedView)
+  );
+};
+
+const renderView = async (selectedView, path) => {
+  changeView(
+    new URL(path, new URL(window.location.href).origin),
+    selectedView.fetchData.bind(selectedView),
     ".container",
     selectedView.render.bind(selectedView),
     selectedView.postRender.bind(selectedView)
@@ -902,14 +915,7 @@ const conjure = async (
     return;
   }
 
-  const {
-    key,
-    public_uri,
-    content_type,
-    feed_uri,
-    func_name,
-    func_identifier,
-  } =
+  const { key, public_uri, content_type, feed_uri, func_identifier } =
     metaData === null
       ? JSON.parse(element.getAttribute("data-conjure"))
       : metaData;
@@ -938,16 +944,9 @@ const conjure = async (
   container.style.width = style.width;
   container.style.height = style.height;
   container.addEventListener("click", async () => {
-    changeView(
-      `/dashboard/functions/${func_identifier}`,
-      async () => {
-        return fetch(`/functions/${func_identifier}`).then((resp) =>
-          resp.json()
-        );
-      },
-      ".container",
-      renderFunctionDetail,
-      () => hljs.highlightAll()
+    renderView(
+      views.find((v) => v.constructor.name === FunctionDetailView.name),
+      `/dashboard/functions/${func_identifier}`
     );
   });
   container.id = `display-${key}`;
