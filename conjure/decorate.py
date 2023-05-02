@@ -208,7 +208,7 @@ class Conjure(object):
     @property
     def identifier(self):
         return self.func_identifier.derive_name(self.callable)
-
+    
     def identify_params(self, *args, **kwargs):
         return self.param_identifier.derive_name(*args, **kwargs)
 
@@ -293,6 +293,10 @@ class Index(object):
                 lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
 
         self.keys_processed_in_current_session = 0
+    
+    @property
+    def conjure_identifier(self):
+        return self.conjure.identifier
 
     @property
     def offset(self):

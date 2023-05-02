@@ -1,11 +1,12 @@
 from typing import List, Union
 from urllib.parse import ParseResult, urlparse
 import falcon
-from conjure.decorate import Conjure
+from conjure.decorate import Conjure, Index
 import multiprocessing
 import gunicorn.app.base
 import sys
 import os
+from collections import defaultdict
 
 from conjure.storage import ensure_str
 
@@ -37,9 +38,15 @@ class ListFunctions(object):
 
 
 class Function(object):
-    def __init__(self, functions: List[Conjure]):
+    def __init__(self, functions: List[Conjure], indexes: List[Index] = []):
         super().__init__()
         self.functions = {f.identifier: f for f in functions}
+        # organize indexes
+        grouped_indexes: dict[List[Index]] = defaultdict(list)
+        for index in indexes:
+            grouped_indexes[index.conjure_identifier].append(index)
+
+        self.grouped = grouped_indexes
 
     def on_get(self, req: falcon.Request, res: falcon.Response, identifier: str):
         try:
@@ -51,9 +58,39 @@ class Function(object):
                 'code': func.code,
                 'url': f'/functions/{func.identifier}',
                 'feed': f'/feed/{func.identifier}',
-                'keys': list(k.decode() for k in func.iter_keys())
+                'keys': list(k.decode() for k in func.iter_keys()),
+                'indexes': list(map(lambda x: x.name, self.grouped.get(identifier, [])))
             }
         except KeyError:
+            res.status = falcon.HTTP_NOT_FOUND
+
+
+class FunctionIndex(object):
+    def __init__(self, functions: List[Conjure], indexes: List[Index]):
+        super().__init__()
+
+        # organize indexes
+        grouped_indexes: dict[List[Index]] = defaultdict(list)
+        for index in indexes:
+            grouped_indexes[index.conjure_identifier].append(index)
+
+        self.grouped = grouped_indexes
+
+    def on_get(
+            self,
+            req: falcon.Request,
+            res: falcon.Response,
+            func_identifier: str,
+            index_name: str):
+
+        try:
+            candidates = self.grouped[func_identifier]
+            filtered_candidates = filter(lambda x: x.name == index_name, candidates)
+            candidate: Index = filtered_candidates[0]
+            query = req.params['q']
+            results = candidate.search(query)
+            res.media = results
+        except (KeyError, IndexError):
             res.status = falcon.HTTP_NOT_FOUND
 
 
@@ -137,19 +174,28 @@ class Dashboard(object):
 
 class MutliFunctionApplication(falcon.API):
 
-    def __init__(self, conjure_funcs: List[Conjure], port: int = None):
+    def __init__(
+            self,
+            conjure_funcs: List[Conjure],
+            indexes: List[Index] = [],
+            port: int = None):
+
         super().__init__(middleware=[])
         self.functions = conjure_funcs
         self.port = port
 
         self.add_route('/functions', ListFunctions(conjure_funcs))
-        self.add_route('/functions/{identifier}', Function(conjure_funcs))
+        self.add_route('/functions/{identifier}', Function(conjure_funcs, indexes))
+        self.add_route(
+            '/functions/{func_identifier}/indexes/{index_name}', 
+            FunctionIndex(conjure_funcs, indexes))
+
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',
                        FunctionResult(conjure_funcs))
-        
         self.add_route('/dashboard', Dashboard(conjure_funcs, port=port))
-        self.add_route('/dashboard/functions/{function_id}', Dashboard(conjure_funcs, port=port))
+        self.add_route(
+            '/dashboard/functions/{function_id}', Dashboard(conjure_funcs, port=port))
 
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):
@@ -173,7 +219,8 @@ def serve_conjure(
         conjure_funcs: List[Conjure],
         port: int = 8888,
         n_workers: int = None,
-        revive=True):
+        revive=True,
+        indexes: List[Index] = []):
 
     app = MutliFunctionApplication(conjure_funcs, port=port)
 
