@@ -894,6 +894,7 @@ class FunctionDetailView extends View {
               // interpolated string
               `/functions/${data.id}/indexes/${index_name}?q=${event.target.value}`
             ).then((data) => {
+              // TODO: render the data
               console.log(data);
             });
           });

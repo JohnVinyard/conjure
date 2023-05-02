@@ -58,7 +58,7 @@ class Function(object):
                 'code': func.code,
                 'url': f'/functions/{func.identifier}',
                 'feed': f'/feed/{func.identifier}',
-                'keys': list(k.decode() for k in func.iter_keys()),
+                'keys': list(k.decode() for k in func.iter_keys())[:10],
                 'indexes': list(map(lambda x: x.name, self.grouped.get(identifier, [])))
             }
         except KeyError:
