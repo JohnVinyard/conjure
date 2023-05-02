@@ -663,9 +663,72 @@ class SeriesView {
   }
 }
 
+/**
+ {
+    "name": "",
+    "description": "",
+    "code": "",
+    "recent": [
+        {
+          "key": ""
+        }
+    ]
+ } 
+ */
+
+// https://stackoverflow.com/questions/30003353/can-es6-template-literals-be-substituted-at-runtime-or-reused
+const inject = (str, obj) => {
+  return str.replace(/\${(.*?)}/g, (x, g) => {
+    let value = obj[g];
+    if (typeof value === "function") {
+      value = value(obj);
+    }
+    return value;
+  });
+};
+
+const micro = (rootElementSelector, templateId, data, mutate) => {
+  const isSelector = typeof rootElementSelector === "string";
+
+  const root = isSelector
+    ? document.querySelector(rootElementSelector)
+    : rootElementSelector;
+  root.innerHTML = "";
+
+  const template = document.getElementById(templateId);
+
+  const normalized = Array.isArray(data) ? data : [data];
+
+  normalized.forEach((d) => {
+    const clone = template.content.firstElementChild.cloneNode(true);
+    let mutated = null;
+
+    if (mutate) {
+      mutated = mutate(clone, d);
+    } else {
+      clone.innerHTML = inject(clone.innerHTML, d);
+    }
+
+    root.appendChild(mutated || clone);
+  });
+};
+
+const renderTest = (rootElementSelector, data) => {
+  micro(rootElementSelector, "function-detail", data, (element, data) => {
+    element.querySelector("#function-name").innerText = data.name;
+    element.querySelector("#function-description").innerText = data.description;
+    element.querySelector("#function-code").innerText = data.code;
+    const listRoot = element.querySelector("#recent-keys");
+
+    micro(listRoot, "function-detail-recent-key", data.recent);
+  });
+};
+
 const renderView = async (path, fetchData, templateId, modifications) => {
+  // fetch data
   const data = await fetchData();
 
+  // update history (TODO: These two should be reversed)
   window.history.pushState({}, "", path(data));
 
   // Clear the main container
@@ -831,9 +894,31 @@ window.addEventListener("popstate", async (event) => {
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-    conjure({
-      // refreshRate: 5000,
-    });
+    // conjure({
+    //   // refreshRate: 5000,
+    // });
+
+    const data = {
+      name: "Test",
+      description: "This is a test",
+      code: "Here is the code",
+      recent: [
+        {
+          key: "item 1",
+          unitCost: 10,
+          nUnits: 11,
+          total: ({ unitCost, nUnits }) => unitCost * nUnits,
+        },
+        {
+          key: "item 2",
+          unitCost: 25,
+          nUnits: 3,
+          total: ({ unitCost, nUnits }) => unitCost * nUnits,
+        },
+      ],
+    };
+
+    renderTest(".container", data);
   },
   false
 );
