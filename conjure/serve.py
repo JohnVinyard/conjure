@@ -21,6 +21,17 @@ class ListFunctions(object):
     def __init__(self, functions: List[Conjure]):
         super().__init__()
         self.functions = {f.identifier: f for f in functions}
+    
+    '''
+    conjure_data = {
+            'key': ensure_str(self.key),
+            'public_uri': urlunparse(self.public_uri),
+            'content_type': self.content_type,
+            'feed_uri': f'/feed/{ensure_str(self.identifier)}',
+            'func_name': self.func_name,
+            'func_identifier': self.func_identifier
+        }
+    '''
 
     def on_get(self, req: falcon.Request, res: falcon.Response):
         res.media = list(map(
@@ -31,7 +42,8 @@ class ListFunctions(object):
                 'content_type': x.content_type,
                 'code': x.code,
                 'url': f'/functions/{x.identifier}',
-                'feed': f'/feed/{x.identifier}'
+                'feed': f'/feed/{x.identifier}',
+                'meta': x.most_recent_meta().conjure_data
             }, self.functions.values()))
         res.status = falcon.HTTP_OK
 
@@ -127,13 +139,10 @@ class Dashboard(object):
         with open(os.path.join(MODULE_DIR, 'dashboard.html'), 'r') as f:
             content = f.read()
             res.content_length = len(content)
-            items = map(lambda x: self._item_html(x),
-                        self.conjure_funcs.values())
             res.body = content.format(
                 script=script,
                 imports=imports,
-                style=style,
-                items='\n'.join(items))
+                style=style)
             res.set_header('content-type', 'text/html')
             res.status = falcon.HTTP_OK
 

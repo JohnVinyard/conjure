@@ -59,9 +59,11 @@ class MetaData(object):
             remote_bucket=remote_bucket,
             content_type=self.content_type,
             is_public=public)
+    
 
-    def conjure_html(self):
-        conjure_data = {
+    @property
+    def conjure_data(self):
+        return {
             'key': ensure_str(self.key),
             'public_uri': urlunparse(self.public_uri),
             'content_type': self.content_type,
@@ -69,7 +71,9 @@ class MetaData(object):
             'func_name': self.func_name,
             'func_identifier': self.func_identifier
         }
-        return f'<div id="conjure-id-{ensure_str(self.key)}" data-conjure=\'{json.dumps(conjure_data)}\'></div>'
+
+    def conjure_html(self):
+        return f'<div id="conjure-id-{ensure_str(self.key)}" data-conjure=\'{json.dumps(self.conjure_data)}\'></div>'
 
 
 class ResultWithMetadata(object):

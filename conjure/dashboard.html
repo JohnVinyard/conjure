@@ -21,23 +21,42 @@
       {style}
     </style>
 
+    <!--Not Found -->
+    <template id="not-found">
+      <div>
+        <h1>404 Not Found</h1>
+      </div>
+    </template>
+
+    <!-- conjure elements -->
+    <template id="dashboard">
+      <div>
+        <div id="id-${{id}}" data-conjure='${{json}}'></div>
+      </div>
+    </template>
+
+
     <!-- function detail -->
     <template id="function-detail">
       <div>
         <div>
           <a href="/dashboard">home</a>
         </div>
-        <h2><code id="function-name"></code></h2>
-        <p id="function-description"></p>
-        <pre><code id="function-code" class="language-python"></code></pre>
-        <ul id="recent-keys"></ul>
+        <h2><code id="function-name">${{name}}</code></h2>
+        <p id="function-description">${{description}}</p>
+        <pre><code id="function-code" class="language-python">${{code}}</code></pre>
+        <ul 
+          id="recent-keys" 
+          data-template="function-detail-recent-key" 
+          data-source="keys">
+        </ul>
       </div>
     </template>
 
     <!-- function detail - recent key -->
     <template id="function-detail-recent-key">
       <div>
-        <li class="recent-item">${{key}} - ${{total}}</li>
+        <li class="recent-item">${{this}}</li>
       </div>
     </template>
 
@@ -46,7 +65,9 @@
   <body>
     <header></header>
     <main>
-      <div class="container">{items}</div>
+      <div class="container">
+
+      </div>
     </main>
     <footer></footer>
   </body>

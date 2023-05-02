@@ -11,6 +11,10 @@ import { line } from "https://cdn.jsdelivr.net/npm/d3-shape@3/+esm";
 const audioCache = {};
 const context = new (window.AudioContext || window.webkitAudioContext)();
 
+const fetchJSON = (url) => {
+  return fetch(url).then((resp) => resp.json());
+};
+
 const fetchAudio = (url, context) => {
   const cached = audioCache[url];
   if (cached !== undefined) {
@@ -213,18 +217,6 @@ class TensorData {
       arr[pos + 3] = scaled;
     });
 
-    // for (let i = 0; i < this.totalSize; i++) {
-    //   const position = i * 4;
-    //   const value = Math.floor(this.data.at(i) * 255);
-
-    //   // console.log(value);
-    //   // const value = Math.random() * 255;
-
-    //   arr[position] = value;
-    //   arr[position + 1] = value;
-    //   arr[position + 2] = value;
-    //   arr[position + 3] = value;
-    // }
     return arr;
   }
 
@@ -449,8 +441,6 @@ class TensorMovieView {
     const width = textureData.shape[0];
     const height = textureData.shape[1];
 
-    // console.log(textureData.data.length, intArray.length, width * height);
-
     const texture = new THREE.DataTexture(
       intArray,
       width,
@@ -484,10 +474,7 @@ class TensorMovieView {
 
     const material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      // alphaMap: texture,
-      // transparent: true,
       displacementMap: texture,
-      // displacementScale: 100
     });
     const cube = new THREE.Mesh(geometry, material);
     cube.name = "plane";
@@ -503,10 +490,7 @@ class TensorMovieView {
     const world = new World(this.element, [1, 0, 1]);
     this.world = world;
 
-    // const visitor = this.buildVisitor();
-
     // render the initial scene
-    // this.tensor.visit(visitor, world.scene);
     this.initScene();
 
     world.sceneUpdater = (elapsedTime) => {
@@ -663,26 +647,20 @@ class SeriesView {
   }
 }
 
-/**
- {
-    "name": "",
-    "description": "",
-    "code": "",
-    "recent": [
-        {
-          "key": ""
-        }
-    ]
- } 
- */
-
 // https://stackoverflow.com/questions/30003353/can-es6-template-literals-be-substituted-at-runtime-or-reused
 const inject = (str, obj) => {
-  return str.replace(/\${(.*?)}/g, (x, g) => {
+  return str.replace(/\${([^}{]+?)}/g, (x, g) => {
+    if (g === "this") {
+      return obj;
+    }
+
     let value = obj[g];
     if (typeof value === "function") {
       value = value(obj);
     }
+
+    console.log(x, g, value);
+
     return value;
   });
 };
@@ -703,80 +681,204 @@ const micro = (rootElementSelector, templateId, data, mutate) => {
     const clone = template.content.firstElementChild.cloneNode(true);
     let mutated = null;
 
+    const subTemplates = clone.querySelectorAll("[data-template]");
+    subTemplates.forEach((template) => {
+      micro(
+        template,
+        template.getAttribute("data-template"),
+        data[template.getAttribute("data-source")]
+      );
+    });
+
     if (mutate) {
       mutated = mutate(clone, d);
     } else {
+      console.log("=============================");
+      console.log("BEFORE", clone.innerHTML);
       clone.innerHTML = inject(clone.innerHTML, d);
+      console.log("AFTER", clone.innerHTML);
     }
 
     root.appendChild(mutated || clone);
   });
 };
 
-const renderTest = (rootElementSelector, data) => {
-  micro(rootElementSelector, "function-detail", data, (element, data) => {
-    element.querySelector("#function-name").innerText = data.name;
-    element.querySelector("#function-description").innerText = data.description;
-    element.querySelector("#function-code").innerText = data.code;
-    const listRoot = element.querySelector("#recent-keys");
-
-    micro(listRoot, "function-detail-recent-key", data.recent);
-  });
-};
-
-const renderView = async (path, fetchData, templateId, modifications) => {
-  // fetch data
+const changeView = async (
+  path,
+  fetchData,
+  rootElementSelector,
+  render,
+  postRender = () => {}
+) => {
+  window.history.pushState({}, "", path);
   const data = await fetchData();
-
-  // update history (TODO: These two should be reversed)
-  window.history.pushState({}, "", path(data));
-
-  // Clear the main container
-  const element = document.querySelector(".container");
-  element.innerHTML = "";
-
-  // Get the template, clone it, mutate the clone and add to the document
-  const tmp = document.getElementById(templateId);
-  const clone = tmp.content.firstElementChild.cloneNode(true);
-
-  Object.entries(modifications).forEach(([selector, mutation]) => {
-    const elements = clone.querySelectorAll(selector);
-    elements.forEach((el) => mutation(data, el));
-  });
-
-  element.appendChild(clone);
-
-  hljs.highlightAll();
+  render(rootElementSelector, data);
+  postRender();
 };
 
-const renderFunctionDetail = async (id) => {
-  renderView(
-    (data) => `/dashboard/functions/${data.id}`,
-    async () => fetch(`/functions/${id}`).then((resp) => resp.json()),
-    "function-detail",
-    {
-      "#function-name": (d, el) => {
-        el.innerHTML = d.name;
-      },
-      "#function-code": (d, el) => {
-        el.innerHTML = d.code;
-      },
-      "#function-description": (d, el) => {
-        el.innerHTML = d.description;
-      },
-      // TODO: This is just a nested template
-      "#recent-keys": (d, el) => {
-        fetch(d.feed)
-          .then((resp) => resp.json())
-          .then((resp) => {
-            resp.slice(0, 10).forEach((k) => {
-              const li = document.createElement("li");
-              li.innerText = k.key;
-              el.appendChild(li);
-            });
-          });
-      },
+class URLPath {
+  constructor() {}
+
+  /**
+   *
+   * @param {URL} url
+   */
+  static fromURL(url) {
+    throw new Error("Not Implemented");
+  }
+
+  get relativeUrl() {
+    throw new Error("Not Implemented");
+  }
+}
+
+class HomeURLPath extends URLPath {
+  constructor() {
+    super();
+  }
+
+  /**
+   *
+   * @param {URL} url
+   */
+  static fromURL(url) {
+    const path = url.pathname;
+    const segments = path.split("/").filter((segment) => segment.length);
+    if (segments.length === 1 && segments[0] === "dashboard") {
+      return new HomeURLPath();
     }
+  }
+
+  get relativeUrl() {
+    return "/dashboard";
+  }
+}
+
+class FunctioDetailUrlPath extends URLPath {
+  constructor(functionId) {
+    super();
+    this.functionId = functionId;
+  }
+
+  /**
+   *
+   * @param {URL} url
+   */
+  static fromURL(url) {
+    const path = url.pathname;
+    const segments = path.split("/");
+    if (
+      segments.length === 3 &&
+      segments[0] === "dashboard" &&
+      segments[1] === "functions"
+    ) {
+      return new FunctioDetailUrlPath(segments[2]);
+    }
+  }
+
+  get relativeUrl() {
+    return `/dashboard/functions/${this.functionId}`;
+  }
+}
+
+class View {
+  constructor(urlClass, templateId) {
+    this._urlClass = urlClass;
+    this._templateId = templateId;
+  }
+
+  get templateId() {
+    return this._templateId;
+  }
+
+  get urlClass() {
+    return this._urlClass;
+  }
+
+  async fetchData(url) {
+    throw new Error("Not Implemented");
+  }
+
+  mutate(data) {
+    return data;
+  }
+
+  render(rootElementSelector, data) {
+    micro(rootElementSelector, this.templateId, this.mutate(data));
+  }
+
+  postRender() {
+    throw new Error("Not Implemented");
+  }
+}
+
+class FunctionDetailView extends View {
+  constructor() {
+    super(FunctioDetailUrlPath, "function-detail");
+  }
+
+  async fetchData(url) {
+    const instance = this.urlClass.fromURL(url);
+    return fetchJSON(`/functions/${instance.functionId}`);
+  }
+
+  postRender() {
+    hljs.highlightAll();
+  }
+}
+
+class DashboardView extends View {
+  constructor() {
+    super(HomeURLPath, "dashboard");
+  }
+
+  async fetchData(url) {
+    return fetchJSON(`/functions`);
+  }
+
+  render(rootElementSelector, data) {
+    micro(rootElementSelector, this.templateId, data, (el, d) => {
+      const conj = el.querySelector("[data-conjure]");
+      conj.setAttribute("id", `id-${d.id}`);
+      conj.setAttribute("data-conjure", JSON.stringify(d.meta));
+      return el;
+    });
+  }
+
+  postRender() {
+    conjure({});
+  }
+}
+
+class NotFoundView extends View {
+  constructor() {
+    super(URLPath, "not-found");
+  }
+
+  async fetchData(url) {
+    return {};
+  }
+
+  postRender() {}
+}
+
+const views = [new DashboardView(), new FunctionDetailView()];
+
+/**
+ *
+ * @param {URL} url
+ */
+const selectAndRenderView = async (url) => {
+  const view = views.find((v) => v.urlClass.fromURL(url));
+
+  const selectedView = view || new NotFoundView();
+
+  changeView(
+    selectedView.urlClass.fromURL(url).relativeUrl,
+    selectedView.fetchData,
+    ".container",
+    selectedView.render.bind(selectedView),
+    selectedView.postRender.bind(selectedView)
   );
 };
 
@@ -836,7 +938,17 @@ const conjure = async (
   container.style.width = style.width;
   container.style.height = style.height;
   container.addEventListener("click", async () => {
-    renderFunctionDetail(func_identifier);
+    changeView(
+      `/dashboard/functions/${func_identifier}`,
+      async () => {
+        return fetch(`/functions/${func_identifier}`).then((resp) =>
+          resp.json()
+        );
+      },
+      ".container",
+      renderFunctionDetail,
+      () => hljs.highlightAll()
+    );
   });
   container.id = `display-${key}`;
   root.appendChild(container);
@@ -888,7 +1000,8 @@ const conjure = async (
 };
 
 window.addEventListener("popstate", async (event) => {
-  console.log("POPSTATE", event);
+  const url = new URL(window.location.href);
+  await selectAndRenderView(url);
 });
 
 document.addEventListener(
@@ -898,27 +1011,8 @@ document.addEventListener(
     //   // refreshRate: 5000,
     // });
 
-    const data = {
-      name: "Test",
-      description: "This is a test",
-      code: "Here is the code",
-      recent: [
-        {
-          key: "item 1",
-          unitCost: 10,
-          nUnits: 11,
-          total: ({ unitCost, nUnits }) => unitCost * nUnits,
-        },
-        {
-          key: "item 2",
-          unitCost: 25,
-          nUnits: 3,
-          total: ({ unitCost, nUnits }) => unitCost * nUnits,
-        },
-      ],
-    };
-
-    renderTest(".container", data);
+    const url = new URL(window.location.href);
+    await selectAndRenderView(url);
   },
   false
 );
