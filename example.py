@@ -89,18 +89,20 @@ def content_index(key: bytes, result: str, *args, **kwargs):
 
 
 def fetch_data():
-    while True:
-        n = all_links.pop()
-        print(f'fetching {n}')
-        textfile(n)
-        sleep(random() * 10)
+    while all_links:
+        try:
+            n = all_links.pop()
+            print(f'fetching {n}')
+            textfile(n)
+        except:
+            continue
 
 if __name__ == '__main__':
 
-    t = Thread(target=fetch_data)
-    t.start()
-
     try:
+        fetch_data()
+        print('indexing...')
+        content_index.index()
 
         p = serve_conjure(
             [

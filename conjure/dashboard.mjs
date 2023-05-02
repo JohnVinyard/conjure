@@ -688,7 +688,9 @@ const inject = (str, obj) => {
   });
 };
 
-const micro = (rootElementSelector, templateId, data, mutate) => {
+const micro = (rootElementSelector, templateId, data, mutate, hooks = null) => {
+  const normalizedHooks = hooks || {};
+
   const isSelector = typeof rootElementSelector === "string";
 
   const root = isSelector
@@ -700,29 +702,39 @@ const micro = (rootElementSelector, templateId, data, mutate) => {
 
   const normalized = Array.isArray(data) ? data : [data];
 
+  const hook = normalizedHooks[templateId];
+
+  console.log(`Got hook ${hook} for template ${templateId}`);
+
   normalized.forEach((d) => {
     const clone = template.content.firstElementChild.cloneNode(true);
     let mutated = null;
 
+    // render any sub-templates
     const subTemplates = clone.querySelectorAll("[data-template]");
     subTemplates.forEach((template) => {
       micro(
         template,
         template.getAttribute("data-template"),
-        data[template.getAttribute("data-source")]
+        data[template.getAttribute("data-source")],
+        undefined,
+        normalizedHooks
       );
     });
 
     if (mutate) {
       mutated = mutate(clone, d);
     } else {
-      console.log("=============================");
-      console.log("BEFORE", clone.innerHTML);
       clone.innerHTML = inject(clone.innerHTML, d);
-      console.log("AFTER", clone.innerHTML);
     }
 
-    root.appendChild(mutated || clone);
+    const normalizedElement = mutated || clone;
+
+    const appendedNode = root.appendChild(normalizedElement);
+
+    if (hook) {
+      hook(appendedNode, d);
+    }
   });
 };
 
@@ -837,6 +849,27 @@ class View {
   }
 }
 
+const reactWhenAddedToDOM = (rootElementSelector, el, data, hook) => {
+  const unique = Math.round(Math.random() * 1e7).toString(16);
+  el.setAttribute("data-unique", unique);
+
+  const observer = new MutationObserver((mutations, observer) => {
+    for (let mutation of mutations) {
+      for (let addedNode of mutation.addedNodes) {
+        // find the corresponding connected node
+        const connected = addedNode.querySelector(`[data-unique="${unique}"]`);
+        observer.disconnect();
+        hook(connected, data);
+        return;
+      }
+    }
+  });
+  observer.observe(document.querySelector(rootElementSelector), {
+    childList: true,
+    subtree: false,
+  });
+};
+
 class FunctionDetailView extends View {
   constructor() {
     super(FunctioDetailUrlPath, "function-detail");
@@ -844,8 +877,29 @@ class FunctionDetailView extends View {
 
   async fetchData(url) {
     const instance = this.urlClass.fromURL(url);
-    console.log("FETCH DATA", url, instance);
     return fetchJSON(`/functions/${instance.functionId}`);
+  }
+
+  render(rootElementSelector, data) {
+    micro(rootElementSelector, this.templateId, data, null, {
+      "function-detail-index": (el, d) => {
+        const input = el.querySelector("input");
+
+        // Add an event listener *after* this element has been added 
+        // to the DOM
+        reactWhenAddedToDOM(rootElementSelector, input, d, (l, index_name) => {
+          l.addEventListener("input", (event) => {
+            fetchJSON(
+              // TODO: This should be a URL instance instead of an 
+              // interpolated string
+              `/functions/${data.id}/indexes/${index_name}?q=${event.target.value}`
+            ).then((data) => {
+              console.log(data);
+            });
+          });
+        });
+      },
+    });
   }
 
   postRender() {
@@ -1031,10 +1085,6 @@ window.addEventListener("popstate", async (event) => {
 document.addEventListener(
   "DOMContentLoaded",
   async () => {
-    // conjure({
-    //   // refreshRate: 5000,
-    // });
-
     const url = new URL(window.location.href);
     await selectAndRenderView(url);
   },

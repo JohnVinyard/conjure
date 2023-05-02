@@ -82,7 +82,12 @@
     <!--function detail - indexes -->
     <template id="function-detail-index">
       <div>
-        <li class="index">${{this}}</li>
+        <li class="index">
+          <div class="card">
+            <h4><code>${{this}}</code></h4>
+            <input type="text" placeholder="enter query" />
+          </div>
+        </li>
       </div>
     </template>
 

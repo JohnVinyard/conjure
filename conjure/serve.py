@@ -8,7 +8,7 @@ import sys
 import os
 from collections import defaultdict
 
-from conjure.storage import ensure_str
+from conjure.storage import ensure_bytes, ensure_str
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -80,17 +80,17 @@ class FunctionIndex(object):
             self,
             req: falcon.Request,
             res: falcon.Response,
-            func_identifier: str,
+            identifier: str,
             index_name: str):
 
         try:
-            candidates = self.grouped[func_identifier]
-            filtered_candidates = filter(lambda x: x.name == index_name, candidates)
+            candidates = self.grouped[identifier]
+            filtered_candidates = list(filter(lambda x: x.name == index_name, candidates))
             candidate: Index = filtered_candidates[0]
             query = req.params['q']
             results = candidate.search(query)
             res.media = results
-        except (KeyError, IndexError):
+        except (KeyError, IndexError) as e:
             res.status = falcon.HTTP_NOT_FOUND
 
 
@@ -188,9 +188,9 @@ class MutliFunctionApplication(falcon.API):
 
         self.add_route('/functions/{identifier}', Function(conjure_funcs, indexes))
 
-        # self.add_route(
-        #     '/functions/{func_identifier}/indexes/{index_name}', 
-        #     FunctionIndex(conjure_funcs, indexes))
+        self.add_route(
+            '/functions/{identifier}/indexes/{index_name}', 
+            FunctionIndex(conjure_funcs, indexes))
 
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',

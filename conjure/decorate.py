@@ -288,6 +288,7 @@ class Index(object):
         self.deserializer = deserializer
         self.conjure = conjure
         self.collection = collection
+
         if register_listener:
             self.conjure.register_listener(
                 lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
@@ -327,16 +328,21 @@ class Index(object):
         document_key = key
 
         for i, pair in enumerate(self.extract(key, result, *args, **kwargs)):
-            key, value = pair
+            try:
+                key, value = pair
 
-            k = ensure_str(key)
+                k = ensure_str(key)
 
-            # NOTE: The assumption here is that index keys are extracted
-            # from the document in an ordered, deterministic way
-            full_key = f'{k}_{ensure_str(document_key)}_{hex(i)}'
+                # NOTE: The assumption here is that index keys are extracted
+                # from the document in an ordered, deterministic way
+                full_key = f'{k}_{ensure_str(document_key)}_{hex(i)}'
 
-            self.collection.put(
-                ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
+                self.collection.put(
+                    ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
+            except Exception as e:
+                print(f'Error processing document {document_key}, {key}')
+                pass
+            
 
         if feed_offset:
             self.collection.set_offset(ensure_bytes(feed_offset))
