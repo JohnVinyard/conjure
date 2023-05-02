@@ -28,6 +28,13 @@
       </div>
     </template>
 
+    <!-- text document -->
+    <template id="text">
+      <div>
+        <pre>${{this}}</pre>
+      </div>
+    </template>
+
     <!-- conjure elements -->
     <template id="dashboard">
       <div>
@@ -45,11 +52,23 @@
         <h2><code id="function-name">${{name}}</code></h2>
         <p id="function-description">${{description}}</p>
         <pre><code id="function-code" class="language-python">${{code}}</code></pre>
-        <ul 
-          id="recent-keys" 
-          data-template="function-detail-recent-key" 
-          data-source="keys">
+
+        <section>
+          <h3>Recent Keys</h3>
+          <ul 
+            id="recent-keys" 
+            data-template="function-detail-recent-key" 
+            data-source="keys">
         </ul>
+        </section>
+        <section>
+          <h3>Indexes</h3>
+          <ul 
+            id="indexes" 
+            data-template="function-detail-index" 
+            data-source="indexes"></ul>
+        </section>
+        
       </div>
     </template>
 
@@ -57,6 +76,13 @@
     <template id="function-detail-recent-key">
       <div>
         <li class="recent-item">${{this}}</li>
+      </div>
+    </template>
+
+    <!--function detail - indexes -->
+    <template id="function-detail-index">
+      <div>
+        <li class="index">${{this}}</li>
       </div>
     </template>
 

@@ -351,6 +351,9 @@ class LocalCollectionWithBackup(Collection):
     def offset(self):
         return self._local.offset
     
+    def index_storage(self, name):
+        return self._local.index_storage(name)
+    
     def set_offset(self, offset):
         self._local.set_offset(offset)
     

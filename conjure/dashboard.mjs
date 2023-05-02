@@ -11,8 +11,14 @@ import { line } from "https://cdn.jsdelivr.net/npm/d3-shape@3/+esm";
 const audioCache = {};
 const context = new (window.AudioContext || window.webkitAudioContext)();
 
-const fetchJSON = (url) => {
-  return fetch(url).then((resp) => resp.json());
+const fetchJSON = async (url) => {
+  const resp = await fetch(url);
+  return resp.json();
+};
+
+const fetchText = async (url) => {
+  const resp = await fetch(url);
+  return resp.text();
 };
 
 const fetchAudio = (url, context) => {
@@ -284,6 +290,23 @@ class TensorData {
       const raw = await resp.arrayBuffer();
       return TensorData.fromNpy(raw);
     });
+  }
+}
+
+class TextView {
+  constructor(elementId, tensor) {
+    this.elementId = elementId;
+    this.tensor = tensor;
+  }
+
+  static async renderURL(url, elementId) {
+    const text = await fetchText(url);
+    const view = new TextView(elementId, text);
+    view.render();
+  }
+
+  render() {
+    micro(`#${this.elementId}`, "text", this.tensor);
   }
 }
 
@@ -925,6 +948,7 @@ const conjure = async (
     "application/time-series+octet-stream": SeriesView,
     "application/tensor-movie+octet-stream": TensorMovieView,
     "audio/wav": AudioView,
+    "text/plain": TextView,
   };
 
   const contentTypeToRootElementType = {
@@ -932,6 +956,7 @@ const conjure = async (
     "application/tensor-movie+octet-stream": "canvas",
     "application/time-series+octet-stream": "div",
     "audio/wav": "canvas",
+    "text/plain": "div",
   };
 
   const renderer = contentTypeToRenderClass[content_type];

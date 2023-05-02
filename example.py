@@ -1,7 +1,9 @@
+import re
 import numpy as np
-from conjure.decorate import numpy_conjure, time_series_conjure
+import requests
+from conjure.decorate import conjure_index, numpy_conjure, text_conjure, time_series_conjure
 from conjure.serve import serve_conjure
-from conjure.storage import LmdbCollection, LocalCollectionWithBackup
+from conjure.storage import LmdbCollection, LocalCollectionWithBackup, ensure_str
 from time import sleep
 from threading import Thread
 from random import random
@@ -64,20 +66,48 @@ def compute_new_spectral_magnitude():
             return
 
 
+def get_all_links():
+    hostname = 'http://textfiles.com'
+    resp = requests.get(f'{hostname}/games/')
+    pattern = re.compile(r'HREF="(?P<path>[^"]+\.txt)"')
+    for match in pattern.finditer(resp.content.decode()):
+        yield f'{hostname}/games/{match.groupdict()["path"]}'
+
+all_links = list(get_all_links())
+
+
+@text_conjure(collection)
+def textfile(url):
+    resp = requests.get(url)
+    return resp.content
+
+@conjure_index(textfile, collection.index_storage('content_index'))
+def content_index(key: bytes, result: str, *args, **kwargs):
+    words = result.split()
+    for word in words:
+        yield word.lower(), dict(key=ensure_str(key))
+
+
+def fetch_data():
+    while True:
+        n = all_links.pop()
+        print(f'fetching {n}')
+        textfile(n)
+        sleep(random() * 10)
+
 if __name__ == '__main__':
 
-    t = Thread(target=add_values)
+    t = Thread(target=fetch_data)
     t.start()
-
-    t2 = Thread(target=compute_new_spectral_magnitude)
-    t2.start()
 
     try:
 
         p = serve_conjure(
             [
-                time_series,
-                spectral_magnitude
+                textfile
+            ],
+            indexes=[
+                content_index
             ],
             port=9999,
             n_workers=2)

@@ -375,7 +375,7 @@ class Index(object):
         return [indexed[k[0]] for k in srt]
 
 
-def conjure_index(conjure: Conjure, collection: Collection, name: str = None):
+def conjure_index(conjure: Conjure, collection: Collection = None, name: str = None):
 
     def deco(f: Callable):
 

@@ -21,4 +21,5 @@
   background-color: #333;
   border: solid 1px #000;
   cursor: pointer;
+  overflow: hidden;
 }

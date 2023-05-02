@@ -185,10 +185,12 @@ class MutliFunctionApplication(falcon.API):
         self.port = port
 
         self.add_route('/functions', ListFunctions(conjure_funcs))
+
         self.add_route('/functions/{identifier}', Function(conjure_funcs, indexes))
-        self.add_route(
-            '/functions/{func_identifier}/indexes/{index_name}', 
-            FunctionIndex(conjure_funcs, indexes))
+
+        # self.add_route(
+        #     '/functions/{func_identifier}/indexes/{index_name}', 
+        #     FunctionIndex(conjure_funcs, indexes))
 
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',
@@ -222,7 +224,7 @@ def serve_conjure(
         revive=True,
         indexes: List[Index] = []):
 
-    app = MutliFunctionApplication(conjure_funcs, port=port)
+    app = MutliFunctionApplication(conjure_funcs, indexes=indexes, port=port)
 
     def worker_int(worker):
         if not revive:
