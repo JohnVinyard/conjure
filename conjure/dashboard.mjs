@@ -682,8 +682,6 @@ const inject = (str, obj) => {
       value = value(obj);
     }
 
-    console.log(x, g, value);
-
     return value;
   });
 };
@@ -703,8 +701,6 @@ const micro = (rootElementSelector, templateId, data, mutate, hooks = null) => {
   const normalized = Array.isArray(data) ? data : [data];
 
   const hook = normalizedHooks[templateId];
-
-  console.log(`Got hook ${hook} for template ${templateId}`);
 
   normalized.forEach((d) => {
     const clone = template.content.firstElementChild.cloneNode(true);
@@ -885,17 +881,17 @@ class FunctionDetailView extends View {
       "function-detail-index": (el, d) => {
         const input = el.querySelector("input");
 
-        // Add an event listener *after* this element has been added 
+        // Add an event listener *after* this element has been added
         // to the DOM
         reactWhenAddedToDOM(rootElementSelector, input, d, (l, index_name) => {
           l.addEventListener("input", (event) => {
             fetchJSON(
-              // TODO: This should be a URL instance instead of an 
+              // TODO: This should be a URL instance instead of an
               // interpolated string
               `/functions/${data.id}/indexes/${index_name}?q=${event.target.value}`
-            ).then((data) => {
-              // TODO: render the data
-              console.log(data);
+            ).then((searchResults) => {
+              const root = el.querySelector(".search-results");
+              console.log(root, searchResults.length);
             });
           });
         });
