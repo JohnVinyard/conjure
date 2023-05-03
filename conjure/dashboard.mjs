@@ -846,6 +846,11 @@ class View {
 }
 
 const reactWhenAddedToDOM = (rootElementSelector, el, data, hook) => {
+  if (el.isConnected) {
+    hook(el, data);
+    return;
+  }
+
   const unique = Math.round(Math.random() * 1e7).toString(16);
   el.setAttribute("data-unique", unique);
 
@@ -883,15 +888,24 @@ class FunctionDetailView extends View {
 
         // Add an event listener *after* this element has been added
         // to the DOM
+
+        // TODO: Try to collapse the nesting here
         reactWhenAddedToDOM(rootElementSelector, input, d, (l, index_name) => {
           l.addEventListener("input", (event) => {
+            const query = event.target.value;
+            
+
             fetchJSON(
               // TODO: This should be a URL instance instead of an
               // interpolated string
-              `/functions/${data.id}/indexes/${index_name}?q=${event.target.value}`
+              `/functions/${data.id}/indexes/${index_name}?q=${query}`
             ).then((searchResults) => {
-              const root = el.querySelector(".search-results");
-              console.log(root, searchResults.length);
+              const root = l.parentElement.querySelector(".search-results");
+
+              micro(root, "index-search-result", searchResults, (srEl, sr) => {
+                srEl.querySelector("li").innerText = sr.key;
+                return srEl;
+              });
             });
           });
         });

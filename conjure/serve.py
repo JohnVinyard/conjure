@@ -88,6 +88,11 @@ class FunctionIndex(object):
             filtered_candidates = list(filter(lambda x: x.name == index_name, candidates))
             candidate: Index = filtered_candidates[0]
             query = req.params['q']
+            
+            if not query:
+                res.media = []
+                return
+            
             results = candidate.search(query)
             res.media = results
         except (KeyError, IndexError) as e:
