@@ -889,6 +889,20 @@ class View {
   }
 }
 
+const debounce = (func, time) => {
+  let handle = null;
+
+  return (...args) => {
+    if (handle) {
+      clearTimeout(handle);
+    }
+
+    handle = setTimeout(async () => {
+      await func(...args);
+    }, time);
+  };
+};
+
 const reactWhenAddedToDOM = (rootElementSelector, el, data, hook) => {
   if (el.isConnected) {
     hook(el, data);
@@ -933,28 +947,37 @@ class FunctionDetailView extends View {
 
   render(rootElementSelector, data) {
     micro(rootElementSelector, this.templateId, data, null, {
-      "function-detail-index": (el, indexName) => {
+      "function-detail-index": (el, { name: indexName, description }) => {
         const input = el.querySelector("input");
         const searchResultsContainer = el.querySelector(".search-results");
+        const totalResults = el.querySelector('.total-results');
 
-        input.addEventListener("input", async (event) => {
-          const functionIndexUrl = new FunctionIndexUrlPath(
-            data.id,
-            indexName,
-            event.target.value
-          );
+        input.addEventListener(
+          "input",
+          debounce(async (event) => {
+            const functionIndexUrl = new FunctionIndexUrlPath(
+              data.id,
+              indexName,
+              event.target.value
+            );
 
-          const searchResults = await fetchJSON(functionIndexUrl.relativeUrl);
+            const searchResults = await fetchJSON(functionIndexUrl.relativeUrl);
 
-          micro(
-            searchResultsContainer,
-            "index-search-result",
-            searchResults,
-            (srEl, sr) => {
-              srEl.querySelector("li").innerText = sr.key;
-            }
-          );
-        });
+            totalResults.innerText = searchResults.length.toString();
+            
+            micro(
+              searchResultsContainer,
+              "index-search-result",
+              searchResults,
+              (srEl, sr) => {
+                srEl.querySelector(".search-result-key").innerText = sr.key;
+                const summary = srEl.querySelector(".search-result-summary");
+                summary.innerText = JSON.stringify(sr, null, 4);
+                hljs.highlightElement(summary);
+              }
+            );
+          }, 250)
+        );
       },
     });
   }

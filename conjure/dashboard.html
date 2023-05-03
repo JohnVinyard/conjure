@@ -84,8 +84,12 @@
       <div>
         <li class="index">
           <div class="card">
-            <h4><code>${{this}}</code></h4>
+            <h4><code>${{name}}</code></h4>
+            <div>
+              ${{description}}
+            </div>
             <input type="text" placeholder="enter query" />
+            <p>total results: <span class="total-results"></span></p>
             <ul class="search-results">
 
             </ul>
@@ -97,7 +101,12 @@
     <!-- function detail - index search result -->
     <template id="index-search-result">
       <div>
-        <li></li>
+        <li class="search-result">
+          <div class="search-result-key"></div>
+          <div>
+            <pre><code class="language-json search-result-summary"></code></pre>
+          </div>
+        </li>
       </div>
     </template>
 
@@ -106,9 +115,7 @@
   <body>
     <header></header>
     <main>
-      <div class="container">
-
-      </div>
+      <div class="container"></div>
     </main>
     <footer></footer>
   </body>

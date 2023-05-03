@@ -3,6 +3,8 @@ import json
 from types import FunctionType
 from typing import Any, Callable, Iterable, Tuple, Union
 from urllib.parse import ParseResult
+
+from markdown import markdown
 from conjure.contenttype import SupportedContentType
 from conjure.identifier import \
     FunctionContentIdentifier, FunctionIdentifier, LiteralParamsIdentifier, \
@@ -18,15 +20,15 @@ from collections import Counter
 
 class MetaData(object):
     def __init__(
-            self, 
-            key, 
-            public_uri: ParseResult, 
-            content_type, 
-            content_length, 
+            self,
+            key,
+            public_uri: ParseResult,
+            content_type,
+            content_length,
             identifier,
             func_name: str,
             func_identifier: str):
-        
+
         super().__init__()
         self.key = key
         self.public_uri = public_uri
@@ -59,7 +61,6 @@ class MetaData(object):
             remote_bucket=remote_bucket,
             content_type=self.content_type,
             is_public=public)
-    
 
     @property
     def conjure_data(self):
@@ -133,7 +134,7 @@ class Conjure(object):
         self.prefer_cache = prefer_cache
 
         self.listeners = []
-    
+
     @property
     def offset(self):
         return self.storage.offset
@@ -167,6 +168,12 @@ class Conjure(object):
     @property
     def description(self):
         return self.callable.__doc__
+
+    @property
+    def description_html(self):
+        formatted = '\n'.join(
+            map(lambda x: x.strip(), (self.description or '').split('\n')))
+        return markdown(formatted)
 
     def iter_keys(self):
         offset = f'{self.identifier}'.encode()
@@ -208,7 +215,7 @@ class Conjure(object):
     @property
     def identifier(self):
         return self.func_identifier.derive_name(self.callable)
-    
+
     def identify_params(self, *args, **kwargs):
         return self.param_identifier.derive_name(*args, **kwargs)
 
@@ -294,7 +301,17 @@ class Index(object):
                 lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
 
         self.keys_processed_in_current_session = 0
-    
+
+    @property
+    def description(self):
+        return self.func.__doc__
+
+    @property
+    def description_html(self):
+        formatted = '\n'.join(
+            map(lambda x: x.strip(), (self.description or '').split('\n')))
+        return markdown(formatted)
+
     @property
     def conjure_identifier(self):
         return self.conjure.identifier
@@ -310,7 +327,7 @@ class Index(object):
         for item in self.conjure.feed(offset=self.offset):
             if self.offset == item['timestamp']:
                 continue
-            
+
             key = item['key']
             obj = self.conjure.get(key)
             # TODO: What if I need to partially/fuly reconstruct the
@@ -324,7 +341,7 @@ class Index(object):
     def content_type(self):
         return 'application/json'
 
-    def extract_and_store(self, key, result, feed_offset = None, *args, **kwargs):
+    def extract_and_store(self, key, result, feed_offset=None, *args, **kwargs):
         document_key = key
 
         for i, pair in enumerate(self.extract(key, result, *args, **kwargs)):
@@ -342,7 +359,6 @@ class Index(object):
             except Exception as e:
                 print(f'Error processing document {document_key}, {key}')
                 pass
-            
 
         if feed_offset:
             self.collection.set_offset(ensure_bytes(feed_offset))

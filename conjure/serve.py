@@ -1,6 +1,7 @@
 from typing import List, Union
 from urllib.parse import ParseResult, urlparse
 import falcon
+from markdown import markdown
 from conjure.decorate import Conjure, Index
 import multiprocessing
 import gunicorn.app.base
@@ -54,12 +55,12 @@ class Function(object):
             res.media = {
                 'id': func.identifier,
                 'name': func.name,
-                'description': func.description or '',
+                'description': func.description_html,
                 'code': func.code,
                 'url': f'/functions/{func.identifier}',
                 'feed': f'/feed/{func.identifier}',
                 'keys': list(k.decode() for k in func.iter_keys())[:10],
-                'indexes': list(map(lambda x: x.name, self.grouped.get(identifier, [])))
+                'indexes': list(map(lambda x: dict(name=x.name, description=x.description_html), self.grouped.get(identifier, [])))
             }
         except KeyError:
             res.status = falcon.HTTP_NOT_FOUND

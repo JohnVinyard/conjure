@@ -78,14 +78,34 @@ all_links = list(get_all_links())
 
 @text_conjure(collection)
 def textfile(url):
+    """
+
+    #Textfile
+
+    Download a text document from [textfiles.com](http://textfiles.com/games/)
+
+    """
     resp = requests.get(url)
     return resp.content
 
 @conjure_index(textfile, collection.index_storage('content_index'))
 def content_index(key: bytes, result: str, *args, **kwargs):
+    """
+
+    #Word-Based Index
+
+    Produce a...
+
+    ```
+    word -> [doc1, doc2]
+    ```
+
+    ...to document mapping
+
+    """
     words = result.split()
     for word in words:
-        yield word.lower(), dict(key=ensure_str(key))
+        yield word.lower(), dict(key=ensure_str(key), word_count=len(words))
 
 
 def fetch_data():
