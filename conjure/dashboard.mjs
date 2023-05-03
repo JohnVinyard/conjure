@@ -93,47 +93,60 @@ const computeIndices = (flatIndex, shape, stride) => {
 
 class World {
   constructor(myCanvas, cameraPosition) {
-    const axes = new THREE.AxesHelper();
+    // const axes = new THREE.AxesHelper();
 
     const scene = new THREE.Scene();
-    scene.add(axes);
+    // scene.add(axes);
 
     const camera = new THREE.PerspectiveCamera(
       50,
       myCanvas.offsetWidth / myCanvas.offsetHeight
     );
     camera.position.set(...cameraPosition);
-    camera.lookAt(scene.position);
+    this.camera = camera;
+
 
     const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
-    renderer.setClearColor(0x000, 1.0);
+    renderer.setClearColor(0xffffff, 1.0);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
+    this.renderer = renderer;
 
-    const orbitControls = new OrbitControls(camera, renderer.domElement);
-    orbitControls.maxPolarAngle = Math.PI * 0.5;
-    orbitControls.minDistance = 0.1;
-    orbitControls.maxDistance = 100;
+    this.setupOrbitControls();
+    
 
     const clock = new THREE.Clock(true);
 
-    const light = new THREE.PointLight(0xffffff, 1, 100);
-    light.position.set(1, 1, 1);
-    scene.add(light);
+    const directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+    scene.add( directionalLight );
+    // const light = new THREE.AmbientLight(0x404040); // soft white light
+    // scene.add(light);
 
     this.scene = scene;
-    this.renderer = renderer;
     this.clock = clock;
-    this.camera = camera;
-    this.orbitControls = orbitControls;
 
     this.elapsedTime = 0;
 
     this.sceneUpdater = null;
   }
 
+  setupOrbitControls() {
+    const orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
+    orbitControls.enablePan = false;
+    orbitControls.enableRotate = false;
+    orbitControls.minPolarAngle = -Math.PI;
+    orbitControls.maxPolarAngle = Math.PI;
+    orbitControls.minDistance = 0.1;
+    orbitControls.maxDistance = 100;
+    this.orbitControls = orbitControls;
+  }
+
   get nChilidren() {
     return this.scene.children.length;
+  }
+
+  childAt(index) {
+    return this.scene.children[index];
   }
 
   getObjectByName(name) {
@@ -151,7 +164,7 @@ class World {
       if (this.sceneUpdater !== null) {
         this.sceneUpdater(this.elapsedTime);
       }
-      this.orbitControls.update();
+      // this.orbitControls.update();
       this.renderer.render(this.scene, this.camera);
     });
   }
@@ -350,7 +363,7 @@ class AudioView {
 
       const size = 0.1;
 
-      const color = new THREE.Color(0x666666);
+      const color = new THREE.Color(0xaaaaaa);
 
       const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
       const material = new THREE.MeshLambertMaterial({
@@ -386,13 +399,23 @@ class AudioView {
     );
 
     // set up the world and store a reference
-    const world = new World(this.element, [50, 0, 50]);
+    const world = new World(this.element, [0, 0, 0]);
     this.world = world;
 
     const visitor = this.buildVisitor();
 
     // render the initial scene
     this.tensor.visit(visitor, world.scene);
+
+    // position the camera
+    const midpoint = Math.floor(this.world.nChilidren / 2);
+    const midBox = this.world.childAt(midpoint);
+
+    world.camera.position.set(0, 0, 25);
+    // world.camera.lookAt(midBox.position.x, 0, 0);
+    world.setupOrbitControls();
+
+
 
     // set the update function on the world
     world.sceneUpdater = (elapsedTime) => {
@@ -418,7 +441,7 @@ class AudioView {
           child.material.color.setHex(0x666666);
         } else {
           child.scale.set(2, 1, 1);
-          child.material.color.setHex(0x999999);
+          child.material.color.setHex(0xffffff);
         }
       });
     };
@@ -950,7 +973,7 @@ class FunctionDetailView extends View {
       "function-detail-index": (el, { name: indexName, description }) => {
         const input = el.querySelector("input");
         const searchResultsContainer = el.querySelector(".search-results");
-        const totalResults = el.querySelector('.total-results');
+        const totalResults = el.querySelector(".total-results");
 
         input.addEventListener(
           "input",
@@ -964,7 +987,7 @@ class FunctionDetailView extends View {
             const searchResults = await fetchJSON(functionIndexUrl.relativeUrl);
 
             totalResults.innerText = searchResults.length.toString();
-            
+
             micro(
               searchResultsContainer,
               "index-search-result",
@@ -998,9 +1021,21 @@ class DashboardView extends View {
 
   render(rootElementSelector, data) {
     micro(rootElementSelector, this.templateId, data, (el, d) => {
+      console.log(data);
+      console.log(d);
+
       const conj = el.querySelector("[data-conjure]");
+      const title = el.querySelector("h3");
+      title.innerText = d.name;
       conj.setAttribute("id", `id-${d.id}`);
       conj.setAttribute("data-conjure", JSON.stringify(d.meta));
+
+      title.addEventListener("click", async () => {
+        renderView(
+          views.find((v) => v.constructor.name === FunctionDetailView.name),
+          `/dashboard/functions/${d.id}`
+        );
+      });
       return el;
     });
   }
@@ -1102,12 +1137,7 @@ const conjure = async (
   const container = document.createElement(rootElement);
   container.style.width = style.width;
   container.style.height = style.height;
-  container.addEventListener("click", async () => {
-    renderView(
-      views.find((v) => v.constructor.name === FunctionDetailView.name),
-      `/dashboard/functions/${func_identifier}`
-    );
-  });
+
   container.id = `display-${key}`;
   root.appendChild(container);
 

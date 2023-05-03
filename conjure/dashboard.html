@@ -6,10 +6,11 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Conjure</title>
 
-    <link rel="stylesheet"
-      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/base16/dracula.min.css">
+    <link
+      rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/base16/dracula.min.css"
+    />
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
-
 
     <script type="importmap">
       {imports}
@@ -38,10 +39,12 @@
     <!-- conjure elements -->
     <template id="dashboard">
       <div>
-        <div id="id-${{id}}" data-conjure='${{json}}'></div>
+        <div class="conjure-container">
+          <h3 class="conjure-title"></h3>
+          <div id="id-${{id}}" data-conjure="${{json}}"></div>
+        </div>
       </div>
     </template>
-
 
     <!-- function detail -->
     <template id="function-detail">
@@ -55,20 +58,20 @@
 
         <section>
           <h3>Recent Keys</h3>
-          <ul 
-            id="recent-keys" 
-            data-template="function-detail-recent-key" 
-            data-source="keys">
-        </ul>
+          <ul
+            id="recent-keys"
+            data-template="function-detail-recent-key"
+            data-source="keys"
+          ></ul>
         </section>
         <section>
           <h3>Indexes</h3>
-          <ul 
-            id="indexes" 
-            data-template="function-detail-index" 
-            data-source="indexes"></ul>
+          <ul
+            id="indexes"
+            data-template="function-detail-index"
+            data-source="indexes"
+          ></ul>
         </section>
-        
       </div>
     </template>
 
@@ -85,14 +88,10 @@
         <li class="index">
           <div class="card">
             <h4><code>${{name}}</code></h4>
-            <div>
-              ${{description}}
-            </div>
+            <div>${{description}}</div>
             <input type="text" placeholder="enter query" />
             <p>total results: <span class="total-results"></span></p>
-            <ul class="search-results">
-
-            </ul>
+            <ul class="search-results"></ul>
           </div>
         </li>
       </div>
@@ -109,8 +108,6 @@
         </li>
       </div>
     </template>
-
-
   </head>
   <body>
     <header></header>

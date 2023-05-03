@@ -1,7 +1,7 @@
 import re
 import numpy as np
 import requests
-from conjure.decorate import conjure_index, numpy_conjure, text_conjure, time_series_conjure
+from conjure.decorate import audio_conjure, conjure_index, numpy_conjure, text_conjure, time_series_conjure
 from conjure.serve import serve_conjure
 from conjure.storage import LmdbCollection, LocalCollectionWithBackup, ensure_str
 from time import sleep
@@ -19,10 +19,36 @@ collection = LocalCollectionWithBackup(
 )
 
 
+@audio_conjure(collection)
+def musicnet_segment(url):
+    import requests
+    from io import BytesIO
+    import zounds
+    from librosa import resample
+
+    resp = requests.get(url)
+    bio = BytesIO(resp.content)
+    original_audio = zounds.AudioSamples.from_file(bio).mono
+    target_sr = zounds.SR11025()
+    samples = resample(
+        original_audio,
+        orig_sr=int(original_audio.samplerate),
+        target_sr=int(target_sr))
+    samples = zounds.AudioSamples(samples, target_sr)
+
+    n_samples = 2 ** 15
+    resampled = zounds.AudioSamples(samples[:n_samples], target_sr)
+
+    output = BytesIO()
+    resampled.encode(output)
+    output.seek(0)
+    return output.read()
+
+
 # @numpy_conjure(collection)
 # def spectral_magnitude(arr: np.ndarray):
 #     """
-#     Compute the spectral magnitude along the last dimension of 
+#     Compute the spectral magnitude along the last dimension of
 #     an arbitrarily-sized tensor
 #     """
 #     spec = np.fft.rfft(arr, axis=-1, norm='ortho')
@@ -66,70 +92,72 @@ collection = LocalCollectionWithBackup(
 #             return
 
 
-def get_all_links():
-    hostname = 'http://textfiles.com'
-    resp = requests.get(f'{hostname}/games/')
-    pattern = re.compile(r'HREF="(?P<path>[^"]+\.txt)"')
-    for match in pattern.finditer(resp.content.decode()):
-        yield f'{hostname}/games/{match.groupdict()["path"]}'
+# def get_all_links():
+#     hostname = 'http://textfiles.com'
+#     resp = requests.get(f'{hostname}/games/')
+#     pattern = re.compile(r'HREF="(?P<path>[^"]+\.txt)"')
+#     for match in pattern.finditer(resp.content.decode()):
+#         yield f'{hostname}/games/{match.groupdict()["path"]}'
 
-all_links = list(get_all_links())
-
-
-@text_conjure(collection)
-def textfile(url):
-    """
-
-    #Textfile
-
-    Download a text document from [textfiles.com](http://textfiles.com/games/)
-
-    """
-    resp = requests.get(url)
-    return resp.content
-
-@conjure_index(textfile, collection.index_storage('content_index'))
-def content_index(key: bytes, result: str, *args, **kwargs):
-    """
-
-    #Word-Based Index
-
-    Produce a...
-
-    ```
-    word -> [doc1, doc2]
-    ```
-
-    ...to document mapping
-
-    """
-    words = result.split()
-    for word in words:
-        yield word.lower(), dict(key=ensure_str(key), word_count=len(words))
+# all_links = list(get_all_links())
 
 
-def fetch_data():
-    while all_links:
-        try:
-            n = all_links.pop()
-            print(f'fetching {n}')
-            textfile(n)
-        except:
-            continue
+# @text_conjure(collection)
+# def textfile(url):
+#     """
 
+#     #Textfile
+
+#     Download a text document from [textfiles.com](http://textfiles.com/games/)
+
+#     """
+#     resp = requests.get(url)
+#     return resp.content
+
+# @conjure_index(textfile, collection.index_storage('content_index'))
+# def content_index(key: bytes, result: str, *args, **kwargs):
+#     """
+
+#     #Word-Based Index
+
+#     Produce a...
+
+#     ```
+#     word -> [doc1, doc2]
+#     ```
+
+#     ...to document mapping
+
+#     """
+#     words = result.split()
+#     for word in words:
+#         yield word.lower(), dict(key=ensure_str(key), word_count=len(words))
+
+
+# def fetch_data():
+#     while all_links:
+#         try:
+#             n = all_links.pop()
+#             print(f'fetching {n}')
+#             textfile(n)
+#         except:
+#             continue
 if __name__ == '__main__':
 
     try:
-        fetch_data()
-        print('indexing...')
-        content_index.index()
+        # fetch_data()
+        # print('indexing...')
+        # content_index.index()
+
+        url = 'https://music-net.s3.amazonaws.com/1919'
+        result = musicnet_segment(url)
 
         p = serve_conjure(
             [
-                textfile
+                musicnet_segment
             ],
             indexes=[
-                content_index
+                # content_index
             ],
             port=9999,
             n_workers=2)
@@ -137,5 +165,5 @@ if __name__ == '__main__':
         input('waiting...')
         p.kill()
     finally:
-        textfile.storage.destroy()
+        # musicnet_segment.storage.destroy()
         pass
