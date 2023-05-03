@@ -686,7 +686,14 @@ const inject = (str, obj) => {
   });
 };
 
-const micro = (rootElementSelector, templateId, data, mutate, hooks = null) => {
+const micro = (
+  rootElementSelector,
+  templateId,
+  data,
+  mutate,
+  hooks = null,
+  baseRoot = null
+) => {
   const normalizedHooks = hooks || {};
 
   const isSelector = typeof rootElementSelector === "string";
@@ -695,6 +702,8 @@ const micro = (rootElementSelector, templateId, data, mutate, hooks = null) => {
     ? document.querySelector(rootElementSelector)
     : rootElementSelector;
   root.innerHTML = "";
+
+  const normalizedBaseRoot = baseRoot || root;
 
   const template = document.getElementById(templateId);
 
@@ -714,7 +723,8 @@ const micro = (rootElementSelector, templateId, data, mutate, hooks = null) => {
         template.getAttribute("data-template"),
         data[template.getAttribute("data-source")],
         undefined,
-        normalizedHooks
+        normalizedHooks,
+        normalizedBaseRoot
       );
     });
 
@@ -726,10 +736,11 @@ const micro = (rootElementSelector, templateId, data, mutate, hooks = null) => {
 
     const normalizedElement = mutated || clone;
 
-    const appendedNode = root.appendChild(normalizedElement);
+    root.appendChild(normalizedElement);
 
     if (hook) {
-      hook(appendedNode, d);
+      reactWhenAddedToDOM(normalizedBaseRoot, normalizedElement, d, hook);
+      // hook(normalizedElement, d);
     }
   });
 };
@@ -742,7 +753,6 @@ const changeView = async (
   postRender = () => {}
 ) => {
   const pushPath = typeof path === "string" ? path : path.pathname;
-
   window.history.pushState({}, "", pushPath);
   const data = await fetchData(pushPath);
   render(rootElementSelector, data);
@@ -814,6 +824,40 @@ class FunctioDetailUrlPath extends URLPath {
   }
 }
 
+/**
+ * NOTE: This is not a dashboard URL, but an API URL
+ */
+class FunctionIndexUrlPath extends URLPath {
+  constructor(functionId, indexName, query) {
+    super();
+    this.functionId = functionId;
+    this.indexName = indexName;
+    this.query = query;
+  }
+
+  /**
+   *
+   * @param {URL} url
+   */
+  static fromURL(url) {
+    const path = typeof url === "string" ? url : url.pathname;
+    const segments = path.split("/").filter((segment) => segment.length);
+    // [functions, id, indexes, name]
+    if (
+      segments.length === 4 &&
+      segments[0] === "functions" &&
+      segments[2] === "indexes"
+    ) {
+      // TODO: extract query string
+      return new FunctionIndexUrlPath(segments[1], segments[3], "");
+    }
+  }
+
+  get relativeUrl() {
+    return `/functions/${this.functionId}/indexes/${this.indexName}?q=${this.query}`;
+  }
+}
+
 class View {
   constructor(urlClass, templateId) {
     this._urlClass = urlClass;
@@ -865,7 +909,13 @@ const reactWhenAddedToDOM = (rootElementSelector, el, data, hook) => {
       }
     }
   });
-  observer.observe(document.querySelector(rootElementSelector), {
+
+  const rootElement =
+    typeof rootElementSelector === "string"
+      ? document.querySelector(rootElementSelector)
+      : rootElementSelector;
+
+  observer.observe(rootElement, {
     childList: true,
     subtree: false,
   });
@@ -883,31 +933,27 @@ class FunctionDetailView extends View {
 
   render(rootElementSelector, data) {
     micro(rootElementSelector, this.templateId, data, null, {
-      "function-detail-index": (el, d) => {
+      "function-detail-index": (el, indexName) => {
         const input = el.querySelector("input");
+        const searchResultsContainer = el.querySelector(".search-results");
 
-        // Add an event listener *after* this element has been added
-        // to the DOM
+        input.addEventListener("input", async (event) => {
+          const functionIndexUrl = new FunctionIndexUrlPath(
+            data.id,
+            indexName,
+            event.target.value
+          );
 
-        // TODO: Try to collapse the nesting here
-        reactWhenAddedToDOM(rootElementSelector, input, d, (l, index_name) => {
-          l.addEventListener("input", (event) => {
-            const query = event.target.value;
-            
+          const searchResults = await fetchJSON(functionIndexUrl.relativeUrl);
 
-            fetchJSON(
-              // TODO: This should be a URL instance instead of an
-              // interpolated string
-              `/functions/${data.id}/indexes/${index_name}?q=${query}`
-            ).then((searchResults) => {
-              const root = l.parentElement.querySelector(".search-results");
-
-              micro(root, "index-search-result", searchResults, (srEl, sr) => {
-                srEl.querySelector("li").innerText = sr.key;
-                return srEl;
-              });
-            });
-          });
+          micro(
+            searchResultsContainer,
+            "index-search-result",
+            searchResults,
+            (srEl, sr) => {
+              srEl.querySelector("li").innerText = sr.key;
+            }
+          );
         });
       },
     });
