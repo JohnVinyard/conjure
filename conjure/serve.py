@@ -249,4 +249,5 @@ def serve_conjure(
 
     p = multiprocessing.Process(target=run, args=())
     p.start()
+    print(f'Running conjure server for funcs ${", ".join(c.name for c in conjure_funcs)} on port ${port}')
     return p

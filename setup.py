@@ -30,5 +30,9 @@ setup(
         'console_scripts': [
             'conjure-markdown = conjure.conjure_markdown:main'
         ]
-    }
+    },
+    include_package_data=True,
+    package_data={
+        '': ['dashboard.html', 'dashboard.mjs', 'imports.json', 'style.css']
+    },
 )

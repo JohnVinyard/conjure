@@ -105,7 +105,6 @@ class World {
     camera.position.set(...cameraPosition);
     this.camera = camera;
 
-
     const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
     renderer.setClearColor(0xffffff, 1.0);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -113,12 +112,11 @@ class World {
     this.renderer = renderer;
 
     this.setupOrbitControls();
-    
 
     const clock = new THREE.Clock(true);
 
-    const directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
-    scene.add( directionalLight );
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    scene.add(directionalLight);
     // const light = new THREE.AmbientLight(0x404040); // soft white light
     // scene.add(light);
 
@@ -131,7 +129,10 @@ class World {
   }
 
   setupOrbitControls() {
-    const orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
+    const orbitControls = new OrbitControls(
+      this.camera,
+      this.renderer.domElement
+    );
     orbitControls.enablePan = false;
     orbitControls.enableRotate = false;
     orbitControls.minPolarAngle = -Math.PI;
@@ -415,8 +416,6 @@ class AudioView {
     // world.camera.lookAt(midBox.position.x, 0, 0);
     world.setupOrbitControls();
 
-
-
     // set the update function on the world
     world.sceneUpdater = (elapsedTime) => {
       if (this.playStartTime === null) {
@@ -664,8 +663,11 @@ class SeriesView {
       .attr("transform", `translate(0, ${height})`)
       .call(axisBottom(x));
 
+    const min = Math.min(...this.tensor.data);
+    const max = Math.max(...this.tensor.data);
+
     // Add Y axis
-    const y = scaleLinear().domain([0, 1]).range([0, height]);
+    const y = scaleLinear().domain([min, max]).range([0, height]);
 
     svg.append("g").call(axisLeft(y));
 
@@ -799,8 +801,9 @@ class URLPath {
 }
 
 class HomeURLPath extends URLPath {
-  constructor() {
+  constructor(query) {
     super();
+    this.query = query;
   }
 
   /**
@@ -808,15 +811,21 @@ class HomeURLPath extends URLPath {
    * @param {URL} url
    */
   static fromURL(url) {
-    const path = typeof url === "string" ? url : url.pathname;
+    const path = typeof url === "string" ? url : `${url.pathname}${url.search}`;
+    const pathAndQuery = path.split("?");
+    const q =
+      pathAndQuery.length > 1
+        ? new URLSearchParams(pathAndQuery.slice(-1)[0])
+        : new URLSearchParams();
+
     const segments = path.split("/").filter((segment) => segment.length);
-    if (segments.length === 1 && segments[0] === "dashboard") {
-      return new HomeURLPath();
+    if (segments.length === 1 && segments[0].startsWith("dashboard")) {
+      return new HomeURLPath(q);
     }
   }
 
   get relativeUrl() {
-    return "/dashboard";
+    return `/dashboard?${this.query}`;
   }
 }
 
@@ -1021,9 +1030,6 @@ class DashboardView extends View {
 
   render(rootElementSelector, data) {
     micro(rootElementSelector, this.templateId, data, (el, d) => {
-      console.log(data);
-      console.log(d);
-
       const conj = el.querySelector("[data-conjure]");
       const title = el.querySelector("h3");
       title.innerText = d.name;
@@ -1041,7 +1047,10 @@ class DashboardView extends View {
   }
 
   postRender() {
-    conjure({});
+    const url = new URL(window.location.href);
+    const refreshRate = parseInt(url.searchParams.get("refresh"));
+
+    conjure({ refreshRate: isNaN(refreshRate) ? null : refreshRate });
   }
 }
 
@@ -1065,6 +1074,7 @@ const views = [new DashboardView(), new FunctionDetailView()];
  */
 const selectAndRenderView = async (url) => {
   const view = views.find((v) => v.urlClass.fromURL(url));
+  console.log(view);
 
   const selectedView = view || new NotFoundView();
 
@@ -1196,6 +1206,7 @@ document.addEventListener(
   "DOMContentLoaded",
   async () => {
     const url = new URL(window.location.href);
+    console.log("URL", url);
     await selectAndRenderView(url);
   },
   false

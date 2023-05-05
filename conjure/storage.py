@@ -194,7 +194,8 @@ class LmdbCollection(Collection):
             path: PathLike,
             extract_base_key: Callable[[bytes], bytes] = None,
             default_database_name: str = 'data',
-            build_feed:bool = True):
+            build_feed:bool = True,
+            port=None):
 
         super().__init__()
 
@@ -215,8 +216,21 @@ class LmdbCollection(Collection):
         self._data = self.env.open_db(self._default_database_name)
         self._offsets = self.env.open_db(b'offsets')
 
+        self._port = port
+
         if self.build_feed:
             self._feed = self.env.open_db(b'feed')
+    
+    def public_uri(self, key: Union[bytes, str]):
+        # TODO: This should be a subclass defined in serve.py
+        if self._port is None:
+            raise NotImplementedError()
+        base = ensure_str(self.extract_base_key(key))
+        k = ensure_str(key)
+
+        uri = f'http://localhost:{self._port}/functions/{base}/{k}'
+        parsed = urlparse(uri)
+        return parsed
 
     @property
     def offset(self):
