@@ -106,7 +106,7 @@ class World {
     this.camera = camera;
 
     const renderer = new THREE.WebGLRenderer({ canvas: myCanvas });
-    renderer.setClearColor(0xffffff, 1.0);
+    renderer.setClearColor(0xeeeeee, 1.0);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
     this.renderer = renderer;
@@ -115,10 +115,10 @@ class World {
 
     const clock = new THREE.Clock(true);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    scene.add(directionalLight);
-    // const light = new THREE.AmbientLight(0x404040); // soft white light
-    // scene.add(light);
+    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    // scene.add(directionalLight);
+    const light = new THREE.AmbientLight(0x404040); // soft white light
+    scene.add(light);
 
     this.scene = scene;
     this.clock = clock;
@@ -135,10 +135,10 @@ class World {
       this.camera,
       this.renderer.domElement
     );
-    orbitControls.enablePan = false;
-    orbitControls.enableRotate = false;
-    orbitControls.minPolarAngle = -Math.PI;
-    orbitControls.maxPolarAngle = Math.PI;
+    orbitControls.enablePan = true;
+    orbitControls.enableRotate = true;
+    // orbitControls.minPolarAngle = -Math.PI;
+    // orbitControls.maxPolarAngle = Math.PI;
     orbitControls.minDistance = 0.1;
     orbitControls.maxDistance = 100;
     this.orbitControls = orbitControls;
@@ -377,7 +377,7 @@ class AudioView {
 
       const size = 0.1;
 
-      const color = new THREE.Color(0xaaaaaa);
+      const color = new THREE.Color(0xffffff);
 
       const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
       const material = new THREE.MeshLambertMaterial({
@@ -472,6 +472,89 @@ class AudioView {
 
     this.element.removeEventListener("click", this.clickHandler);
     this.element.addEventListener("click", this.clickHandler);
+  }
+}
+
+class TwoDimTensorView {
+  constructor(elementId, tensor) {
+    this.elementId = elementId;
+    this.tensor = tensor;
+    this.world = null;
+    this.texture = null;
+  }
+
+  _buildTexture() {
+    if (this.texture) {
+      return texture;
+    }
+
+    const intArray = this.tensor.toRGBA();
+
+    const [width, height] = this.tensor.shape;
+
+    const texture = new THREE.DataTexture(
+      intArray,
+      width,
+      height,
+      THREE.RedFormat,
+      THREE.UnsignedByteType
+    );
+
+    texture.needsUpdate = true;
+    this.texture = texture;
+    return texture;
+  }
+
+  get element() {
+    return document.getElementById(this.elementId);
+  }
+
+  static async renderURL(url, elementId) {
+    const data = await TensorData.fromURL(url);
+    const view = new TwoDimTensorView(elementId, data);
+    view.render();
+    return view;
+  }
+
+  initScene() {
+    const texture = this._buildTexture();
+    const size = 0.5;
+
+    const geometry = new THREE.PlaneBufferGeometry(size, size);
+
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x049ef4,
+      // displacementMap: texture,
+    });
+
+    // material.bumpMap = texture;
+    material.map = texture;
+    material.needsUpdate = true;
+
+    const cube = new THREE.Mesh(geometry, material);
+    cube.name = "plane";
+    cube.position.x = 0;
+    cube.position.y = 0;
+    cube.position.z = 0;
+
+    this.world.scene.add(cube);
+  }
+
+  render() {
+    // set up the world and store a reference
+    if (!this.world) {
+      const world = new World(this.element, [1, 0, 1]);
+      this.world = world;
+    } else {
+      this.world.clear();
+    }
+
+    // render the initial scene
+    this.initScene();
+
+    if (!this.world.isStarted) {
+      this.world.start();
+    }
   }
 }
 
@@ -1168,7 +1251,7 @@ const conjure = async (
       : metaData;
 
   const contentTypeToRenderClass = {
-    "application/tensor+octet-stream": TensorView,
+    "application/tensor+octet-stream": TwoDimTensorView,
     "application/time-series+octet-stream": SeriesView,
     "application/tensor-movie+octet-stream": TensorMovieView,
     "audio/wav": AudioView,
