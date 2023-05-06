@@ -30,8 +30,9 @@ class FunctionNameIdentifier(FunctionIdentifier):
 
 
 class FunctionContentIdentifier(FunctionIdentifier):
-    def __init__(self):
+    def __init__(self, include_closures=False):
         super().__init__()
+        self.include_closures = include_closures
 
     def _hash_function(self, f):
         h = sha1()
@@ -41,7 +42,9 @@ class FunctionContentIdentifier(FunctionIdentifier):
         else:
             freevars = None
 
-        h.update(pickle.dumps(freevars))
+        if self.include_closures:
+            h.update(pickle.dumps(freevars))
+
         h.update(pickle.dumps(f.__code__.co_consts))
         h.update(f.__name__.encode())
         h.update(f.__code__.co_code)

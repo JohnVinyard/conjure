@@ -126,6 +126,8 @@ class World {
     this.elapsedTime = 0;
 
     this.sceneUpdater = null;
+
+    this.isStarted = false;
   }
 
   setupOrbitControls() {
@@ -158,7 +160,15 @@ class World {
     this.scene.children.forEach(func);
   }
 
+  clear() {
+    while (this.scene.children.length) {
+      this.scene.remove(this.scene.children[0]);
+    }
+  }
+
   start() {
+    this.isStarted = true;
+
     this.renderer.setAnimationLoop(() => {
       this.elapsedTime += this.clock.getDelta();
 
@@ -317,6 +327,7 @@ class TextView {
     const text = await fetchText(url);
     const view = new TextView(elementId, text);
     view.render();
+    return view;
   }
 
   render() {
@@ -343,15 +354,17 @@ class AudioView {
     };
   }
 
-  static async renderURL(url, elementId) {
+  static async renderURL(url, elementId, existingView = null) {
     const rawData = await fetchAudio(url, context);
     const samplerate = rawData.sampleRate;
     const channelData = rawData.getChannelData(0);
     const data = new TensorData(channelData, [channelData.length], {
       samplerate,
     });
-    const view = new AudioView(elementId, data, url);
+    const view = existingView || new AudioView(elementId, data, url);
+    view.tensor = data;
     view.render();
+    return view;
   }
 
   buildVisitor() {
@@ -394,15 +407,7 @@ class AudioView {
     return document.getElementById(this.elementId);
   }
 
-  render() {
-    console.log(
-      `Setting up scene with ${AudioView.name} and ${this.element.id}`
-    );
-
-    // set up the world and store a reference
-    const world = new World(this.element, [0, 0, 0]);
-    this.world = world;
-
+  _innerRender(world) {
     const visitor = this.buildVisitor();
 
     // render the initial scene
@@ -414,7 +419,6 @@ class AudioView {
 
     world.camera.position.set(0, 0, 25);
     // world.camera.lookAt(midBox.position.x, 0, 0);
-    world.setupOrbitControls();
 
     // set the update function on the world
     world.sceneUpdater = (elapsedTime) => {
@@ -444,8 +448,27 @@ class AudioView {
         }
       });
     };
+  }
 
-    world.start();
+  render() {
+    console.log(
+      `Setting up scene with ${AudioView.name} and ${this.element.id}`
+    );
+
+    if (!this.world) {
+      // set up the world and store a reference
+      const world = new World(this.element, [0, 0, 0]);
+      this.world = world;
+      world.setupOrbitControls();
+    } else {
+      this.world.clear();
+    }
+
+    this._innerRender(this.world);
+
+    if (!this.world.isStarted) {
+      this.world.start();
+    }
 
     this.element.removeEventListener("click", this.clickHandler);
     this.element.addEventListener("click", this.clickHandler);
@@ -507,6 +530,7 @@ class TensorMovieView {
     const data = await TensorData.fromURL(url);
     const view = new TensorMovieView(elementId, data);
     view.render();
+    return view;
   }
 
   initScene() {
@@ -532,8 +556,12 @@ class TensorMovieView {
 
   render() {
     // set up the world and store a reference
-    const world = new World(this.element, [1, 0, 1]);
-    this.world = world;
+    if (!this.world) {
+      const world = new World(this.element, [1, 0, 1]);
+      this.world = world;
+    } else {
+      this.world.clear();
+    }
 
     // render the initial scene
     this.initScene();
@@ -557,7 +585,9 @@ class TensorMovieView {
     this.element.removeEventListener("click", this.clickHandler);
     this.element.addEventListener("click", this.clickHandler);
 
-    world.start();
+    if (!this.world.isStarted) {
+      this.world.start();
+    }
   }
 }
 
@@ -568,10 +598,12 @@ class TensorView {
     this.world = null;
   }
 
-  static async renderURL(url, elementId) {
+  static async renderURL(url, elementId, existingView = null) {
     const data = await TensorData.fromURL(url);
-    const view = new TensorView(elementId, data);
+    const view = existingView || new TensorView(elementId, data);
+    view.tensor = data;
     view.render();
+    return view;
   }
 
   get element() {
@@ -607,16 +639,22 @@ class TensorView {
       `Setting up scene with ${TensorView.name} and ${this.element.id}`
     );
 
-    // set up the world and store a reference
-    const world = new World(this.element, [50, 0, 50]);
-    this.world = world;
+    if (!this.world) {
+      // set up the world and store a reference
+      const world = new World(this.element, [50, 0, 50]);
+      this.world = world;
+    } else {
+      this.world.clear();
+    }
 
     const visitor = this.buildVisitor();
 
     // render the initial scene
-    this.tensor.visit(visitor, world.scene);
+    this.tensor.visit(visitor, this.world.scene);
 
-    world.start();
+    if (!this.world.isStarted) {
+      this.world.start();
+    }
   }
 }
 
@@ -626,10 +664,12 @@ class SeriesView {
     this.tensor = tensor;
   }
 
-  static async renderURL(url, elementId) {
+  static async renderURL(url, elementId, existingView = null) {
     const data = await TensorData.fromURL(url);
-    const view = new SeriesView(elementId, data);
+    const view = existingView || new SeriesView(elementId, data);
+    view.tensor = data;
     view.render();
+    return view;
   }
 
   get element() {
@@ -1097,6 +1137,8 @@ const renderView = async (selectedView, path) => {
   );
 };
 
+const VIEW_CACHE = {};
+
 const conjure = async (
   {
     element = null,
@@ -1109,6 +1151,8 @@ const conjure = async (
   }
 ) => {
   if (element === null) {
+    // find all the conjure elements in the document and conjure
+    // them individually
     const elements = document.querySelectorAll("[data-conjure]");
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
@@ -1117,6 +1161,7 @@ const conjure = async (
     return;
   }
 
+  // extract the data about this specific conjure element
   const { key, public_uri, content_type, feed_uri, func_identifier } =
     metaData === null
       ? JSON.parse(element.getAttribute("data-conjure"))
@@ -1138,20 +1183,30 @@ const conjure = async (
     "text/plain": "div",
   };
 
+  // here, I need to check if there's already a renderer instance created,
+  // update its data, and re-render
+
+  const containerId = `display-${key}`;
+
+  // undefined or an *instance* of a view class
+  const existing = VIEW_CACHE[containerId];
+
   const renderer = contentTypeToRenderClass[content_type];
   const rootElement = contentTypeToRootElementType[content_type];
 
   const root = element;
-  root.innerHTML = "";
 
-  const container = document.createElement(rootElement);
-  container.style.width = style.width;
-  container.style.height = style.height;
+  if (!existing) {
+    root.innerHTML = "";
+    const container = document.createElement(rootElement);
+    container.style.width = style.width;
+    container.style.height = style.height;
+    container.id = containerId;
+    root.appendChild(container);
+  }
 
-  container.id = `display-${key}`;
-  root.appendChild(container);
-
-  await renderer.renderURL(public_uri, container.id);
+  const view = await renderer.renderURL(public_uri, containerId, existing);
+  VIEW_CACHE[containerId] = view;
 
   // TODO: If there's a refresh rate specified, periodically
   // check the feed.  If there's an item with a timestamp larger

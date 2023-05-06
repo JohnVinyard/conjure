@@ -493,7 +493,7 @@ def time_series_conjure(storage: Collection, name: bytes):
     return conjure(
         content_type=SupportedContentType.TimeSeries.value,
         storage=storage,
-        func_identifier=FunctionContentIdentifier(),
+        func_identifier=FunctionContentIdentifier(include_closures=False),
         param_identifier=LiteralParamsIdentifier(name),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),

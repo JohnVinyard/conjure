@@ -96,10 +96,11 @@ class TestNumpyStorage(TestCase):
             loss,
             content_type=SupportedContentType.TimeSeries.value,
             storage=self.db,
-            func_identifier=FunctionContentIdentifier(),
+            func_identifier=FunctionContentIdentifier(include_closures=False),
             param_identifier=LiteralParamsIdentifier(b'loss'),
             serializer=NumpySerializer(),
-            deserializer=NumpyDeserializer()
+            deserializer=NumpyDeserializer(),
+            prefer_cache=False
         )
 
         loss(np.random.normal(0, 1, (1,)))
