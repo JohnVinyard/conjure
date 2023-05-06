@@ -44,6 +44,16 @@ def musicnet_segment(url):
     output.seek(0)
     return output.read()
 
+@numpy_conjure(collection)
+def musicnet_spectrogram(url):
+    import zounds
+    from io import BytesIO
+    audio = musicnet_segment(url)
+    input = BytesIO(audio)
+    input.seek(0)
+    samples = zounds.AudioSamples.from_file(input)
+    spec = np.abs(zounds.spectral.stft(samples))
+    return spec.astype(np.float32)
 
 # @numpy_conjure(collection)
 # def spectral_magnitude(arr: np.ndarray):
@@ -151,10 +161,12 @@ if __name__ == '__main__':
 
         url = 'https://music-net.s3.amazonaws.com/1919'
         result = musicnet_segment(url)
+        spec = musicnet_spectrogram(url)
 
         p = serve_conjure(
             [
-                musicnet_segment
+                musicnet_segment,
+                musicnet_spectrogram
             ],
             indexes=[
                 # content_index
