@@ -115,10 +115,11 @@ class World {
 
     const clock = new THREE.Clock(true);
 
-    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    // scene.add(directionalLight);
-    const light = new THREE.AmbientLight(0x404040); // soft white light
-    scene.add(light);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    directionalLight.position.x = 0;
+    directionalLight.position.y = 0;
+    directionalLight.position.z = -10;
+    scene.add(directionalLight);
 
     this.scene = scene;
     this.clock = clock;
@@ -518,17 +519,31 @@ class TwoDimTensorView {
 
   initScene() {
     const texture = this._buildTexture();
-    const size = 0.5;
 
-    const geometry = new THREE.PlaneBufferGeometry(size, size);
+    const [width, height] = this.tensor.shape;
 
-    const material = new THREE.MeshBasicMaterial({
+
+    const geometry = new THREE.PlaneBufferGeometry(1, 1, width, height);
+
+    const material = new THREE.MeshStandardMaterial({
       color: 0x049ef4,
-      // displacementMap: texture,
+      displacementMap: texture,
+      side: THREE.DoubleSide,
+      roughness: 1,
+      metalness: 0,
+      depthTest: true,
+      depthWrite: true,
+      flatShading: true,
+      // wireframe: true,
+      // vertexColors: true
     });
 
+    material.normalMap = texture;
+    material.normalScale.set(1, 1);
+
+    // material.envMap = texture;
     // material.bumpMap = texture;
-    material.map = texture;
+    // material.map = texture;
     material.needsUpdate = true;
 
     const cube = new THREE.Mesh(geometry, material);
@@ -699,7 +714,11 @@ class TensorView {
 
       const size = 0.5;
 
-      const color = new THREE.Color(1 * value, 0.5 * value, 0.1 * value);
+      const color = new THREE.Color(
+        1 * value, 
+        0.5 * value, 
+        0.1 * value
+      );
 
       const geometry = new THREE.BoxGeometry(size, size, size);
       const material = new THREE.MeshBasicMaterial({
