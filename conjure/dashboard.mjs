@@ -452,9 +452,9 @@ class AudioView {
   }
 
   render() {
-    console.log(
-      `Setting up scene with ${AudioView.name} and ${this.element.id}`
-    );
+    // console.log(
+    //   `Setting up scene with ${AudioView.name} and ${this.element.id}`
+    // );
 
     if (!this.world) {
       // set up the world and store a reference
@@ -737,9 +737,9 @@ class TensorView {
   }
 
   render() {
-    console.log(
-      `Setting up scene with ${TensorView.name} and ${this.element.id}`
-    );
+    // console.log(
+    //   `Setting up scene with ${TensorView.name} and ${this.element.id}`
+    // );
 
     if (!this.world) {
       // set up the world and store a reference
@@ -779,9 +779,9 @@ class SeriesView {
   }
 
   render() {
-    console.log(
-      `Setting up scene with ${SeriesView.name} and ${this.element.id}`
-    );
+    // console.log(
+    //   `Setting up scene with ${SeriesView.name} and ${this.element.id}`
+    // );
     const [nChannels, size] = this.tensor.shape;
 
     // TODO: get these values from the element
@@ -1216,7 +1216,7 @@ const views = [new DashboardView(), new FunctionDetailView()];
  */
 const selectAndRenderView = async (url) => {
   const view = views.find((v) => v.urlClass.fromURL(url));
-  console.log(view);
+  // console.log(view);
 
   const selectedView = view || new NotFoundView();
 
@@ -1305,6 +1305,9 @@ const conjure = async (
     container.style.height = style.height;
     container.id = containerId;
     root.appendChild(container);
+    console.log(`New view for ${containerId}`);
+  } else {
+    console.log(`Existing view for ${containerId}`);
   }
 
   const view = await renderer.renderURL(public_uri, containerId, existing);
