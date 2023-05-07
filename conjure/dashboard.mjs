@@ -533,8 +533,8 @@ class TwoDimTensorView {
       metalness: 0,
       depthTest: true,
       depthWrite: true,
-      flatShading: true,
-      // wireframe: true,
+      // flatShading: true,
+      wireframe: true,
       // vertexColors: true
     });
 
