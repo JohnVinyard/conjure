@@ -416,7 +416,6 @@ class AudioView {
 
     // position the camera
     const midpoint = Math.floor(this.world.nChilidren / 2);
-    const midBox = this.world.childAt(midpoint);
 
     world.camera.position.set(0, 0, 25);
     // world.camera.lookAt(midBox.position.x, 0, 0);
@@ -433,7 +432,6 @@ class AudioView {
       const currentBlock = Math.round(
         (currentTime * this.samplerate) / this.stepSize
       );
-      // const cube = this.world.getObjectByName(currentBlock);
 
       this.world.traverseChildren((child) => {
         if (!child.material) {
@@ -452,10 +450,6 @@ class AudioView {
   }
 
   render() {
-    // console.log(
-    //   `Setting up scene with ${AudioView.name} and ${this.element.id}`
-    // );
-
     if (!this.world) {
       // set up the world and store a reference
       const world = new World(this.element, [0, 0, 0]);
@@ -522,29 +516,18 @@ class TwoDimTensorView {
 
     const [width, height] = this.tensor.shape;
 
-
     const geometry = new THREE.PlaneBufferGeometry(1, 1, width, height);
 
     const material = new THREE.MeshStandardMaterial({
       color: 0x049ef4,
-      displacementMap: texture,
-      side: THREE.DoubleSide,
-      roughness: 1,
-      metalness: 0,
-      depthTest: true,
-      depthWrite: true,
-      // flatShading: true,
-      wireframe: true,
-      // vertexColors: true
+      // displacementMap: texture,
+      // side: THREE.DoubleSide,
     });
 
-    material.normalMap = texture;
-    material.normalScale.set(1, 1);
+    // material.normalMap = texture;
+    // material.normalScale.set(1, 1);
 
-    // material.envMap = texture;
-    // material.bumpMap = texture;
-    // material.map = texture;
-    material.needsUpdate = true;
+    // material.needsUpdate = true;
 
     const cube = new THREE.Mesh(geometry, material);
     cube.name = "plane";
@@ -714,11 +697,7 @@ class TensorView {
 
       const size = 0.5;
 
-      const color = new THREE.Color(
-        1 * value, 
-        0.5 * value, 
-        0.1 * value
-      );
+      const color = new THREE.Color(1 * value, 0.5 * value, 0.1 * value);
 
       const geometry = new THREE.BoxGeometry(size, size, size);
       const material = new THREE.MeshBasicMaterial({
@@ -737,9 +716,6 @@ class TensorView {
   }
 
   render() {
-    // console.log(
-    //   `Setting up scene with ${TensorView.name} and ${this.element.id}`
-    // );
 
     if (!this.world) {
       // set up the world and store a reference
@@ -779,7 +755,6 @@ class SeriesView {
   }
 
   render() {
-    // console.log(
     //   `Setting up scene with ${SeriesView.name} and ${this.element.id}`
     // );
     const [nChannels, size] = this.tensor.shape;
