@@ -953,7 +953,7 @@ class SeriesView {
     const max = Math.max(...this.tensor.data);
 
     // Add Y axis
-    const y = scaleLinear().domain([min, max]).range([0, height]);
+    const y = scaleLinear().domain([min, max]).range([height, 0]);
 
     svg.append("g").call(axisLeft(y));
 
@@ -971,7 +971,7 @@ class SeriesView {
         .datum(data)
         .attr("fill", "none")
         .attr("stroke", colors[i])
-        .attr("stroke-width", 1.5)
+        .attr("stroke-width", 2)
         .attr(
           "d",
           line()
