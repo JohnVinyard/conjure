@@ -604,12 +604,14 @@ class TextView {
 class BasicAudioView {
   constructor(elementId, tensor, url, stepSize = 512) {
     this.elementId = elementId;
+    this.stepSize = stepSize;
+    this.init(tensor, url);
+  }
+
+  init(tensor, url) {
     this.tensor = tensor;
     this.url = url;
-    this.stepSize = stepSize;
-
     this.playStartTime = null;
-
     this.clickHandler = () => {
       playAudio(url, context, 0, undefined, () => {});
     };
