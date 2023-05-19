@@ -625,8 +625,7 @@ class BasicAudioView {
       samplerate,
     });
     const view = existingView || new BasicAudioView(elementId, data, url);
-    view.tensor = data;
-    view.url = url;
+    view.init(data, url);
     view.render();
     return view;
   }
