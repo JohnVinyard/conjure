@@ -609,12 +609,14 @@ class BasicAudioView {
   }
 
   init(tensor, url) {
+    this.element.removeEventListener("click", this.clickHandler);
     this.tensor = tensor;
     this.url = url;
     this.playStartTime = null;
     this.clickHandler = () => {
       playAudio(url, context, 0, undefined, () => {});
     };
+    this.element.addEventListener("click", this.clickHandler);
   }
 
   static async renderURL(url, elementId, existingView = null) {
@@ -665,9 +667,6 @@ class BasicAudioView {
       ctxt.fillStyle = `rgb(${r}, ${g}, ${b})`;
       ctxt.fillRect(pos, midline - h / 2, sampleWidth, h);
     });
-
-    this.element.removeEventListener("click", this.clickHandler);
-    this.element.addEventListener("click", this.clickHandler);
   }
 }
 
