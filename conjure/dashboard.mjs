@@ -644,6 +644,7 @@ class BasicAudioView {
     const sampleWidth = width / nElements;
 
     const ctxt = this.element.getContext("2d");
+    ctxt.clearRect(0, 0, width, height);
 
     this.tensor.visit((value, location, scene) => {
       const [x, y, z] = location;
@@ -694,6 +695,7 @@ class BasicSpectrogramView {
     const [w, h] = this.tensor.shape;
 
     const ctxt = this.element.getContext("2d");
+    ctxt.clearRect(0, 0, width, height);
 
     const imageData = ctxt.getImageData(0, 0, width, height);
 
