@@ -705,6 +705,7 @@ class BasicSpectrogramView {
 
     const stride = 4;
 
+
     for (let i = 0; i < imageData.data.length; i += stride) {
       // pixel space
       const x = (i / stride) % imageData.width;
@@ -719,7 +720,8 @@ class BasicSpectrogramView {
       const row = this.tensor.getElement(timeIndex);
       const val = row.getElement(featureIndex);
 
-      const intensity = Math.floor(val * 255);
+
+      const intensity = Math.floor(Math.abs(val) * 255);
       imageData.data[i] = COLOR_MAP[intensity][0];
       imageData.data[i + 1] = COLOR_MAP[intensity][1];
       imageData.data[i + 2] = COLOR_MAP[intensity][2];
