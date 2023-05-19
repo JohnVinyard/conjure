@@ -907,9 +907,10 @@ class TensorView {
 }
 
 class SeriesView {
-  constructor(elementId, tensor) {
+  constructor(elementId, tensor, maxSamples = 500) {
     this.elementId = elementId;
     this.tensor = tensor;
+    this.maxSamples = maxSamples;
   }
 
   static async renderURL(url, elementId, existingView = null) {
@@ -962,6 +963,7 @@ class SeriesView {
     for (let i = 0; i < nChannels; i++) {
       const data = this.tensor
         .getChannelData(i)
+        .slice(-this.maxSamples)
         .map((value, index) => ({ value, index }));
 
       svg
