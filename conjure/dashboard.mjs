@@ -611,12 +611,7 @@ class BasicAudioView {
     this.playStartTime = null;
 
     this.clickHandler = () => {
-      // this.playStartTime = this.world.elapsedTime;
-
-      playAudio(url, context, 0, undefined, () => {
-        // the audio is done playing;
-        // this.playStartTime = null;
-      });
+      playAudio(url, context, 0, undefined, () => {});
     };
   }
 
@@ -732,226 +727,6 @@ class BasicSpectrogramView {
   }
 }
 
-// class AudioView {
-//   constructor(elementId, tensor, url, stepSize = 512) {
-//     this.elementId = elementId;
-//     this.tensor = tensor;
-//     this.url = url;
-//     this.playStartTime = null;
-//     this.world = null;
-//     this.stepSize = stepSize;
-
-//     this.clickHandler = () => {
-//       this.playStartTime = this.world.elapsedTime;
-
-//       playAudio(url, context, 0, undefined, () => {
-//         // the audio is done playing;
-//         this.playStartTime = null;
-//       });
-//     };
-//   }
-
-//   static async renderURL(url, elementId, existingView = null) {
-//     const rawData = await fetchAudio(url, context);
-//     const samplerate = rawData.sampleRate;
-//     const channelData = rawData.getChannelData(0);
-//     const data = new TensorData(channelData, [channelData.length], {
-//       samplerate,
-//     });
-//     const view = existingView || new AudioView(elementId, data, url);
-//     view.tensor = data;
-//     view.render();
-//     return view;
-//   }
-
-//   buildVisitor() {
-//     const renderAudioVisitor = (value, location, scene) => {
-//       const [x, y, z] = location;
-
-//       if (x % this.stepSize !== 0) {
-//         return;
-//       }
-
-//       const size = 0.1;
-
-//       const color = new THREE.Color(0xffffff);
-
-//       const geometry = new THREE.BoxGeometry(size, Math.abs(value) * 50, size);
-//       const material = new THREE.MeshLambertMaterial({
-//         color,
-//       });
-//       const cube = new THREE.Mesh(geometry, material);
-
-//       cube.position.x = (x / this.stepSize) * size;
-//       cube.position.y = 0;
-//       cube.position.z = 0;
-
-//       cube.name = `${Math.floor(x / this.stepSize)}`;
-
-//       scene.add(cube);
-
-//       return cube;
-//     };
-
-//     return renderAudioVisitor;
-//   }
-
-//   get samplerate() {
-//     return this.tensor.metadata.samplerate;
-//   }
-
-//   get element() {
-//     return document.getElementById(this.elementId);
-//   }
-
-//   _innerRender(world) {
-//     const visitor = this.buildVisitor();
-
-//     // render the initial scene
-//     this.tensor.visit(visitor, world.scene);
-
-//     // position the camera
-//     const midpoint = Math.floor(this.world.nChilidren / 2);
-
-//     world.camera.position.set(0, 0, 25);
-//     // world.camera.lookAt(midBox.position.x, 0, 0);
-
-//     // set the update function on the world
-//     world.sceneUpdater = (elapsedTime) => {
-//       if (this.playStartTime === null) {
-//         // the audio isn't currently playing, so there's
-//         // no need to animate anything
-//         return;
-//       }
-
-//       const currentTime = elapsedTime - this.playStartTime;
-//       const currentBlock = Math.round(
-//         (currentTime * this.samplerate) / this.stepSize
-//       );
-
-//       this.world.traverseChildren((child) => {
-//         if (!child.material) {
-//           return;
-//         }
-
-//         if (child.name !== currentBlock.toString()) {
-//           child.scale.set(1, 1, 1);
-//           child.material.color.setHex(0x666666);
-//         } else {
-//           child.scale.set(2, 1, 1);
-//           child.material.color.setHex(0xffffff);
-//         }
-//       });
-//     };
-//   }
-
-//   render() {
-//     if (!this.world) {
-//       // set up the world and store a reference
-//       const world = new World(this.element, [0, 0, 0]);
-//       this.world = world;
-//       world.setupOrbitControls();
-//     } else {
-//       this.world.clear();
-//     }
-
-//     this._innerRender(this.world);
-
-//     if (!this.world.isStarted) {
-//       this.world.start();
-//     }
-
-//     this.element.removeEventListener("click", this.clickHandler);
-//     this.element.addEventListener("click", this.clickHandler);
-//   }
-// }
-
-// class TwoDimTensorView {
-//   constructor(elementId, tensor) {
-//     this.elementId = elementId;
-//     this.tensor = tensor;
-//     this.world = null;
-//     this.texture = null;
-//   }
-
-//   _buildTexture() {
-//     if (this.texture) {
-//       return texture;
-//     }
-
-//     const intArray = this.tensor.toRGBA();
-
-//     const [width, height] = this.tensor.shape;
-
-//     const texture = new THREE.DataTexture(
-//       intArray,
-//       width,
-//       height,
-//       THREE.RedFormat,
-//       THREE.UnsignedByteType
-//     );
-
-//     texture.needsUpdate = true;
-//     this.texture = texture;
-//     return texture;
-//   }
-
-//   get element() {
-//     return document.getElementById(this.elementId);
-//   }
-
-//   static async renderURL(url, elementId) {
-//     const data = await TensorData.fromURL(url);
-//     const view = new TwoDimTensorView(elementId, data);
-//     view.render();
-//     return view;
-//   }
-
-//   initScene() {
-//     const texture = this._buildTexture();
-
-//     const [width, height] = this.tensor.shape;
-
-//     const geometry = new THREE.PlaneBufferGeometry(1, 1, width, height);
-
-//     const material = new THREE.MeshStandardMaterial({
-//       color: 0x049ef4,
-//       // displacementMap: texture,
-//       // side: THREE.DoubleSide,
-//     });
-
-//     // material.normalMap = texture;
-//     // material.normalScale.set(1, 1);
-
-//     // material.needsUpdate = true;
-
-//     const cube = new THREE.Mesh(geometry, material);
-//     cube.name = "plane";
-//     cube.position.x = 0;
-//     cube.position.y = 0;
-//     cube.position.z = 0;
-
-//     this.world.scene.add(cube);
-//   }
-
-//   render() {
-//     // set up the world and store a reference
-//     if (!this.world) {
-//       const world = new World(this.element, [1, 0, 1]);
-//       this.world = world;
-//     } else {
-//       this.world.clear();
-//     }
-
-//     // render the initial scene
-//     this.initScene();
-
-//     if (!this.world.isStarted) {
-//       this.world.start();
-//     }
-//   }
-// }
-
 class TensorMovieView {
   constructor(elementId, tensor, samplerate = 42) {
     this.elementId = elementId;
@@ -980,7 +755,6 @@ class TensorMovieView {
 
     const textureData = this.tensor.getElement(index);
 
-    // const intArray = new Uint8ClampedArray(textureData.data.buffer);
     const intArray = textureData.toRGBA();
 
     const width = textureData.shape[0];
@@ -1013,8 +787,6 @@ class TensorMovieView {
   initScene() {
     const texture = this.textureAtPosition(0);
     const size = 0.5;
-
-    // const color = new THREE.Color(1, 1, 1);
 
     const geometry = new THREE.PlaneBufferGeometry(size, size);
 
@@ -1150,8 +922,6 @@ class SeriesView {
   }
 
   render() {
-    //   `Setting up scene with ${SeriesView.name} and ${this.element.id}`
-    // );
     const [nChannels, size] = this.tensor.shape;
 
     // TODO: get these values from the element
@@ -1610,6 +1380,7 @@ const renderView = async (selectedView, path) => {
 
 const VIEW_CACHE = {};
 
+// TODO: Conjure should take in a map of overridden cotent-type -> component mappings
 const conjure = async (
   {
     element = null,
