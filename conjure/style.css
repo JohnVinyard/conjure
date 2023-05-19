@@ -1,9 +1,16 @@
-body {
-  background-color: darkslategray;
-}
 #display {
   width: 500px;
   height: 500px;
+}
+
+canvas {
+  /* background-color: #111; */
+  background: rgb(0, 0, 0);
+  background: radial-gradient(
+    circle,
+    rgba(0, 0, 0, 1) 0%,
+    rgba(21, 21, 21, 1) 79%
+  );
 }
 
 .conjure-container {
@@ -21,7 +28,6 @@ body {
   flex-wrap: wrap;
   height: 1000px;
   width: 100%;
-  /* background-color: #eee; */
   row-gap: 10px;
   column-gap: 10px;
 }

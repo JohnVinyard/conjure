@@ -53,7 +53,7 @@ def musicnet_spectrogram(url):
     input.seek(0)
     samples = zounds.AudioSamples.from_file(input)
     spec = np.abs(zounds.spectral.stft(samples))
-    return spec.astype(np.float32).T
+    return spec.astype(np.float32)
 
 # @numpy_conjure(collection)
 # def spectral_magnitude(arr: np.ndarray):
