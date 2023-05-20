@@ -705,27 +705,29 @@ class BasicSpectrogramView {
 
     const stride = 4;
 
-
     for (let i = 0; i < imageData.data.length; i += stride) {
-      // pixel space
-      const x = (i / stride) % imageData.width;
-      const y = Math.floor(i / stride / imageData.width);
+      try {
+        // pixel space
+        const x = (i / stride) % imageData.width;
+        const y = Math.floor(i / stride / imageData.width);
 
-      // feature space
-      const timeIndex = Math.floor(x * timeRatio);
-      // since the coordinate system goes from top to bottom, we'll need to
-      // invert the order we draw features in
-      const featureIndex = h - 1 - Math.floor(y * featureRatio);
+        // feature space
+        const timeIndex = Math.floor(x * timeRatio);
+        // since the coordinate system goes from top to bottom, we'll need to
+        // invert the order we draw features in
+        const featureIndex = h - 1 - Math.floor(y * featureRatio);
 
-      const row = this.tensor.getElement(timeIndex);
-      const val = row.getElement(featureIndex);
+        const row = this.tensor.getElement(timeIndex);
+        const val = row.getElement(featureIndex);
 
-
-      const intensity = Math.floor(Math.abs(val) * 255);
-      imageData.data[i] = COLOR_MAP[intensity][0];
-      imageData.data[i + 1] = COLOR_MAP[intensity][1];
-      imageData.data[i + 2] = COLOR_MAP[intensity][2];
-      imageData.data[i + 3] = 255;
+        const intensity = Math.min(255, Math.floor(Math.abs(val) * 255));
+        imageData.data[i] = COLOR_MAP[intensity][0];
+        imageData.data[i + 1] = COLOR_MAP[intensity][1];
+        imageData.data[i + 2] = COLOR_MAP[intensity][2];
+        imageData.data[i + 3] = 255;
+      } catch (err) {
+        console.warn(err);
+      }
     }
 
     ctxt.putImageData(imageData, 0, 0);
@@ -793,12 +795,31 @@ class TensorMovieView {
     const texture = this.textureAtPosition(0);
     const size = 0.5;
 
-    const geometry = new THREE.PlaneBufferGeometry(size, size);
+    const [_, width, height] = this.tensor.shape;
+
+    const geometry = new THREE.PlaneBufferGeometry(size, size, width, height);
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0x049ef4,
       displacementMap: texture,
+      side: THREE.DoubleSide,
+      roughness: 1,
+      metalness: 0,
+      depthTest: true,
+      depthWrite: true,
+      // flatShading: true,
+      wireframe: true,
+      // vertexColors: true
     });
+
+    // material.normalMap = texture;
+
+    // material.envMap = texture;
+    // material.bumpMap = texture;
+    // material.map = texture;
+
+    material.needsUpdate = true;
+
     const cube = new THREE.Mesh(geometry, material);
     cube.name = "plane";
     cube.position.x = 0;
@@ -820,7 +841,7 @@ class TensorMovieView {
     // render the initial scene
     this.initScene();
 
-    world.sceneUpdater = (elapsedTime) => {
+    this.world.sceneUpdater = (elapsedTime) => {
       if (!this.playStartTime) {
         return;
       }
@@ -832,8 +853,13 @@ class TensorMovieView {
 
       const plane = this.world.getObjectByName("plane");
 
-      plane.material.bumpMap = texture;
-      plane.material.needsUpdate = true;
+      // plane.material.bumpMap = texture;
+      // plane.material.needsUpdate = true;
+
+      const material = plane.material;
+      // material.normalMap = texture;
+      material.displacementMap = texture;
+      material.needsUpdate = true;
     };
 
     this.element.removeEventListener("click", this.clickHandler);

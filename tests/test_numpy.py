@@ -31,6 +31,7 @@ class TestNumpyStorage(TestCase):
 
     def tearDown(self) -> None:
         self.db.destroy()
+    
 
     def test_can_get_metadata(self):
         def get_spec_mag(x: np.ndarray) -> np.ndarray:

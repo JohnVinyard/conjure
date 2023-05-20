@@ -1,13 +1,17 @@
 import re
 import numpy as np
 import requests
+from conjure.contenttype import SupportedContentType
 from conjure.decorate import audio_conjure, conjure_index, numpy_conjure, text_conjure, time_series_conjure
 from conjure.serve import serve_conjure
 from conjure.storage import LmdbCollection, LocalCollectionWithBackup, ensure_str
 from time import sleep
 from threading import Thread
 from random import random
-
+import torch
+import zounds
+from io import BytesIO
+import zounds
 
 # collection = LmdbCollection('conjure-test')
 collection = LocalCollectionWithBackup(
@@ -54,6 +58,34 @@ def musicnet_spectrogram(url):
     samples = zounds.AudioSamples.from_file(input)
     spec = np.abs(zounds.spectral.stft(samples))
     return spec.astype(np.float32)
+
+
+@numpy_conjure(collection, content_type=SupportedContentType.TensorMovie.value)
+def scattering_like_transform(arr: np.ndarray):
+    signal = torch.from_numpy(arr).float().view(1, 1, arr.shape[-1])
+    sr = zounds.SR22050()
+    band = zounds.FrequencyBand(20, sr.nyquist)
+
+    channels = 128
+
+    scale = zounds.MelScale(band, channels)
+    fb = zounds.learn.FilterBank(
+        sr, 256, scale, 0.1, normalize_filters=True, a_weighting=False)
+    spec = fb.forward(signal, normalize=False)
+
+    window_size = 512
+    step_size = window_size // 2
+    n_coeffs = window_size // 2 + 1
+
+    windowed = spec.unfold(-1, window_size, step_size)
+
+    scatter = torch.abs(torch.fft.rfft(windowed, dim=-1, norm='ortho'))
+    result = scatter.view(channels, -1, n_coeffs).permute(1, 2, 0).float()
+
+    data = result.data.cpu().numpy()
+    data = data / (np.abs(data.max()) + 1e-12)  # normalize
+
+    return data
 
 # @numpy_conjure(collection)
 # def spectral_magnitude(arr: np.ndarray):
@@ -160,13 +192,19 @@ if __name__ == '__main__':
         # content_index.index()
 
         url = 'https://music-net.s3.amazonaws.com/1919'
+
         result = musicnet_segment(url)
+        io = BytesIO(result)
+        samples = zounds.AudioSamples.from_file(io)
+
         spec = musicnet_spectrogram(url)
+        aim = scattering_like_transform(samples)
 
         p = serve_conjure(
             [
                 musicnet_segment,
-                musicnet_spectrogram
+                musicnet_spectrogram,
+                scattering_like_transform
             ],
             indexes=[
                 # content_index
