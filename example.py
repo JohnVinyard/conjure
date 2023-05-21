@@ -57,6 +57,9 @@ def musicnet_spectrogram(url):
     input.seek(0)
     samples = zounds.AudioSamples.from_file(input)
     spec = np.abs(zounds.spectral.stft(samples))
+    spec = np.log(1 + spec)
+    spec += spec.min()
+    spec /= (spec.max() + 1e-12)
     return spec.astype(np.float32)
 
 
@@ -80,12 +83,15 @@ def scattering_like_transform(arr: np.ndarray):
     windowed = spec.unfold(-1, window_size, step_size)
 
     scatter = torch.abs(torch.fft.rfft(windowed, dim=-1, norm='ortho'))
+    scatter = torch.log(1 + scatter)
+    scatter += scatter.min()
+
     result = scatter.view(channels, -1, n_coeffs).permute(1, 2, 0).float()
 
     data = result.data.cpu().numpy()
     data = data / (np.abs(data.max()) + 1e-12)  # normalize
 
-    return data
+    return data.astype(np.float32)
 
 # @numpy_conjure(collection)
 # def spectral_magnitude(arr: np.ndarray):

@@ -376,11 +376,12 @@ class World {
     renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
     this.renderer = renderer;
 
-    this.setupOrbitControls();
+    // this.setupOrbitControls();
 
     const clock = new THREE.Clock(true);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    const directionalLight = new THREE.AmbientLight(0xffffff);
     directionalLight.position.x = 0;
     directionalLight.position.y = 0;
     directionalLight.position.z = -10;
@@ -394,6 +395,10 @@ class World {
     this.sceneUpdater = null;
 
     this.isStarted = false;
+  }
+
+  setCameraPosition(pos) {
+    this.camera.position.set(pos);
   }
 
   setupOrbitControls() {
@@ -747,6 +752,7 @@ class TensorMovieView {
 
     this.clickHandler = () => {
       this.playStartTime = this.world.elapsedTime;
+
       setTimeout(() => {
         this.playStartTime = null;
       }, durationMs);
@@ -793,30 +799,26 @@ class TensorMovieView {
 
   initScene() {
     const texture = this.textureAtPosition(0);
-    const size = 0.5;
 
     const [_, width, height] = this.tensor.shape;
 
-    const geometry = new THREE.PlaneBufferGeometry(size, size, width, height);
+    const ratio = width / height;
+
+    const w = 0.5;
+    const h = w * ratio;
+
+    const geometry = new THREE.PlaneBufferGeometry(w, h, width / 4, height / 4);
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x049ef4,
+      color: 0x000000,
       displacementMap: texture,
       side: THREE.DoubleSide,
       roughness: 1,
       metalness: 0,
       depthTest: true,
       depthWrite: true,
-      // flatShading: true,
       wireframe: true,
-      // vertexColors: true
     });
-
-    // material.normalMap = texture;
-
-    // material.envMap = texture;
-    // material.bumpMap = texture;
-    // material.map = texture;
 
     material.needsUpdate = true;
 
@@ -827,12 +829,35 @@ class TensorMovieView {
     cube.position.z = 0;
 
     this.world.scene.add(cube);
+
+    const parent = this.element.parentNode;
+    const xLabel = document.createElement("div");
+    xLabel.innerText = "Frequency";
+    xLabel.style = `
+      position: absolute;
+      top: 15%;
+      left: 42%;
+      
+    `;
+
+    const yLabel = document.createElement("div");
+    yLabel.style = `
+      position: absolute;
+      top: 45%;
+      left: 25%;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    `;
+    yLabel.innerText = "Periodicity";
+
+    parent.insertBefore(xLabel, this.element);
+    parent.insertBefore(yLabel, this.element);
   }
 
   render() {
     // set up the world and store a reference
     if (!this.world) {
-      const world = new World(this.element, [1, 0, 1]);
+      const world = new World(this.element, [0, 0, 1.5]);
       this.world = world;
     } else {
       this.world.clear();
@@ -853,16 +878,14 @@ class TensorMovieView {
 
       const plane = this.world.getObjectByName("plane");
 
-      // plane.material.bumpMap = texture;
-      // plane.material.needsUpdate = true;
-
       const material = plane.material;
-      // material.normalMap = texture;
       material.displacementMap = texture;
       material.needsUpdate = true;
     };
 
-    this.element.removeEventListener("click", this.clickHandler);
+    if (this.clickHandler) {
+      this.element.removeEventListener("click", this.clickHandler);
+    }
     this.element.addEventListener("click", this.clickHandler);
 
     if (!this.world.isStarted) {
