@@ -63,3 +63,15 @@ canvas {
   cursor: pointer;
   overflow: hidden;
 }
+
+.axis line {
+  stroke: whitesmoke;
+}
+
+.axis path {
+  stroke: whitesmoke;
+}
+
+.axis text {
+  fill: whitesmoke;
+}

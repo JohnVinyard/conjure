@@ -989,6 +989,7 @@ class SeriesView {
       .append("svg")
       .attr("width", width)
       .attr("height", height)
+      .style("background-color", "#000")
       .append("g")
       .attr("transform", `translate(50, -10)`);
 
@@ -998,6 +999,7 @@ class SeriesView {
     svg
       .append("g")
       .attr("transform", `translate(0, ${height})`)
+      .attr("class", "axis")
       .call(axisBottom(x));
 
     const min = Math.min(...this.tensor.data);
@@ -1006,12 +1008,14 @@ class SeriesView {
     // Add Y axis
     const y = scaleLinear().domain([min, max]).range([height, 0]);
 
-    svg.append("g").call(axisLeft(y));
-
-    const colors = ["#afa", "#faa"];
+    svg.append("g").call(axisLeft(y)).attr("class", "axis");
 
     // render lines for each "channel"
     for (let i = 0; i < nChannels; i++) {
+      const index = Math.floor(Math.random() * COLOR_MAP.length);
+      const [r, g, b] = COLOR_MAP[index];
+      const color = `rgb(${r}, ${g}, ${b})`;
+
       const data = this.tensor
         .getChannelData(i)
         .slice(-this.maxSamples)
@@ -1021,7 +1025,7 @@ class SeriesView {
         .append("path")
         .datum(data)
         .attr("fill", "none")
-        .attr("stroke", colors[i])
+        .attr("stroke", color)
         .attr("stroke-width", 2)
         .attr(
           "d",
