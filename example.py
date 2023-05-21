@@ -63,6 +63,21 @@ def musicnet_spectrogram(url):
     return spec.astype(np.float32)
 
 
+@time_series_conjure(collection, name='samples')
+def samples_view(url):
+    import zounds
+    from io import BytesIO
+    audio = musicnet_segment(url)
+    input = BytesIO(audio)
+    input.seek(0)
+    samples = zounds.AudioSamples.from_file(input)
+
+    output = np.zeros((2, 128))
+    output[0] = samples[8192: 8192 + 128]
+    output[1] = samples[4096: 4096 + 128]
+    return output
+
+
 @numpy_conjure(collection, content_type=SupportedContentType.TensorMovie.value)
 def scattering_like_transform(arr: np.ndarray):
     signal = torch.from_numpy(arr).float().view(1, 1, arr.shape[-1])
@@ -206,11 +221,14 @@ if __name__ == '__main__':
         spec = musicnet_spectrogram(url)
         aim = scattering_like_transform(samples)
 
+        samples_view(url)
+
         p = serve_conjure(
             [
                 musicnet_segment,
                 musicnet_spectrogram,
-                scattering_like_transform
+                scattering_like_transform,
+                samples_view
             ],
             indexes=[
                 # content_index
