@@ -847,8 +847,8 @@ class TensorMovieView {
     xLabel.innerText = "Frequency";
     xLabel.style = `
       position: absolute;
-      top: 15%;
-      left: 42%;
+      top: 5%;
+      left: 25%;
       
     `;
 
@@ -856,7 +856,7 @@ class TensorMovieView {
     yLabel.style = `
       position: absolute;
       top: 45%;
-      left: 25%;
+      left: 10%;
       writing-mode: vertical-rl;
       text-orientation: mixed;
     `;
