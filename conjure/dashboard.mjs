@@ -1566,8 +1566,13 @@ document.addEventListener(
   "DOMContentLoaded",
   async () => {
     const url = new URL(window.location.href);
-    console.log("URL", url);
-    await selectAndRenderView(url);
+    // KLUDGE: What's a better way to determine whether
+    // this is the "app" or just an included script
+    if (url.pathname.includes("dashboard")) {
+      await selectAndRenderView(url);
+    } else {
+      await conjure();
+    }
   },
   false
 );
