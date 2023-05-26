@@ -357,8 +357,10 @@ const computeIndices = (flatIndex, shape, stride) => {
 };
 
 class World {
-  constructor(myCanvas, cameraPosition) {
+  constructor(myCanvas, cameraPosition, enableOrbitControls) {
     // const axes = new THREE.AxesHelper();
+
+    this.enableOrbitControls = enableOrbitControls;
 
     const scene = new THREE.Scene();
     // scene.add(axes);
@@ -376,7 +378,9 @@ class World {
     renderer.setSize(myCanvas.offsetWidth, myCanvas.offsetHeight);
     this.renderer = renderer;
 
-    // this.setupOrbitControls();
+    if (this.enableOrbitControls) {
+      this.setupOrbitControls();
+    }
 
     const clock = new THREE.Clock(true);
 
@@ -602,7 +606,8 @@ class TextView {
   }
 
   render() {
-    // Build a template here
+    // Build a template here since we can't depend on template elements
+    // from dashboard.html
     const template = document.createElement("template");
     const div = document.createElement("div");
     const pre = document.createElement("pre");
@@ -947,7 +952,7 @@ class TensorView {
   render() {
     if (!this.world) {
       // set up the world and store a reference
-      const world = new World(this.element, [50, 0, 50]);
+      const world = new World(this.element, [10, 10, 10], true);
       this.world = world;
     } else {
       this.world.clear();
@@ -1068,7 +1073,6 @@ const micro = (
   hooks = null,
   baseRoot = null
 ) => {
-
   const normalizedHooks = hooks || {};
 
   const isSelector = typeof rootElementSelector === "string";
@@ -1084,7 +1088,6 @@ const micro = (
     typeof templateId === "string"
       ? document.getElementById(templateId)
       : templateId;
-    
 
   const normalized = Array.isArray(data) ? data : [data];
 
@@ -1482,7 +1485,8 @@ const conjure = async (
       : metaData;
 
   const contentTypeToRenderClass = {
-    "application/tensor+octet-stream": BasicSpectrogramView,
+    "application/spectrogram+octet-stream": BasicSpectrogramView,
+    "application/tensor+octet-stream": TensorView,
     "application/time-series+octet-stream": SeriesView,
     "application/tensor-movie+octet-stream": TensorMovieView,
     "audio/wav": BasicAudioView,
@@ -1490,6 +1494,7 @@ const conjure = async (
   };
 
   const contentTypeToRootElementType = {
+    "application/spectrogram+octet-stream": "canvas",
     "application/tensor+octet-stream": "canvas",
     "application/tensor-movie+octet-stream": "canvas",
     "application/time-series+octet-stream": "div",

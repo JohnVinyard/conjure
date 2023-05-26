@@ -54,7 +54,7 @@ def musicnet_segment(url):
     return output.read()
 
 
-@numpy_conjure(collection)
+@numpy_conjure(collection, content_type=SupportedContentType.Spectrogram.value)
 def musicnet_spectrogram(url):
     import zounds
     from io import BytesIO
@@ -114,15 +114,15 @@ def scattering_like_transform(arr: np.ndarray):
 
     return data.astype(np.float32)
 
-# @numpy_conjure(collection)
-# def spectral_magnitude(arr: np.ndarray):
-#     """
-#     Compute the spectral magnitude along the last dimension of
-#     an arbitrarily-sized tensor
-#     """
-#     spec = np.fft.rfft(arr, axis=-1, norm='ortho')
-#     spec = np.abs(spec).astype(np.float32)
-#     return spec
+@numpy_conjure(collection)
+def spectral_magnitude(arr: np.ndarray):
+    """
+    Compute the spectral magnitude along the last dimension of
+    an arbitrarily-sized tensor
+    """
+    spec = np.fft.rfft(arr, axis=-1, norm='ortho')
+    spec = np.abs(spec).astype(np.float32)
+    return spec
 
 
 # d = {
@@ -227,6 +227,8 @@ if __name__ == '__main__':
         spec = musicnet_spectrogram(url)
         aim = scattering_like_transform(samples)
 
+        mag = spectral_magnitude(np.random.normal(0, 1, (5, 6, 7)))
+
         samples_view(url)
 
         text_experiment()
@@ -237,7 +239,8 @@ if __name__ == '__main__':
                 musicnet_segment,
                 musicnet_spectrogram,
                 scattering_like_transform,
-                samples_view
+                samples_view,
+                spectral_magnitude
             ],
             indexes=[
                 # content_index
