@@ -602,7 +602,14 @@ class TextView {
   }
 
   render() {
-    micro(`#${this.elementId}`, "text", this.tensor);
+    // Build a template here
+    const template = document.createElement("template");
+    const div = document.createElement("div");
+    const pre = document.createElement("pre");
+    pre.innerText = "${this}";
+    div.appendChild(pre);
+    template.content.appendChild(div);
+    micro(`#${this.elementId}`, template, this.tensor);
   }
 }
 
@@ -1061,6 +1068,7 @@ const micro = (
   hooks = null,
   baseRoot = null
 ) => {
+
   const normalizedHooks = hooks || {};
 
   const isSelector = typeof rootElementSelector === "string";
@@ -1072,7 +1080,11 @@ const micro = (
 
   const normalizedBaseRoot = baseRoot || root;
 
-  const template = document.getElementById(templateId);
+  const template =
+    typeof templateId === "string"
+      ? document.getElementById(templateId)
+      : templateId;
+    
 
   const normalized = Array.isArray(data) ? data : [data];
 

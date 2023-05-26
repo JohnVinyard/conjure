@@ -23,6 +23,11 @@ collection = LocalCollectionWithBackup(
 )
 
 
+@text_conjure(collection)
+def text_experiment():
+    return 'Lorem ipsum...'
+
+
 @audio_conjure(collection)
 def musicnet_segment(url):
     import requests
@@ -47,6 +52,7 @@ def musicnet_segment(url):
     resampled.encode(output)
     output.seek(0)
     return output.read()
+
 
 @numpy_conjure(collection)
 def musicnet_spectrogram(url):
@@ -223,8 +229,11 @@ if __name__ == '__main__':
 
         samples_view(url)
 
+        text_experiment()
+
         p = serve_conjure(
             [
+                text_experiment,
                 musicnet_segment,
                 musicnet_spectrogram,
                 scattering_like_transform,
