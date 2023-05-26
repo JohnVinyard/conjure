@@ -1473,6 +1473,7 @@ const conjure = async (
     const elements = document.querySelectorAll("[data-conjure]");
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
+      el.style.position = "relative";
       await conjure({ element: el, refreshRate, feedOffset });
     }
     return;
