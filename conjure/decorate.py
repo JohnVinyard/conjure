@@ -427,7 +427,8 @@ def conjure(
         serializer: Serializer,
         deserializer: Deserializer,
         key_delimiter='_',
-        prefer_cache=True):
+        prefer_cache=True,
+        read_from_cache_hook=lambda x: None):
 
     def deco(f: Callable):
         return Conjure(
@@ -440,6 +441,7 @@ def conjure(
             deserializer=deserializer,
             key_delimiter=key_delimiter,
             prefer_cache=prefer_cache,
+            read_from_cache_hook=read_from_cache_hook
         )
 
     return deco
@@ -469,7 +471,10 @@ def json_conjure(storage: Collection, tag_deserialized=False):
     )
 
 
-def numpy_conjure(storage: Collection, content_type=SupportedContentType.Tensor.value):
+def numpy_conjure(
+        storage: Collection, 
+        content_type=SupportedContentType.Tensor.value,
+        read_hook=lambda x: None):
 
     return conjure(
         content_type=content_type,
@@ -478,6 +483,7 @@ def numpy_conjure(storage: Collection, content_type=SupportedContentType.Tensor.
         param_identifier=ParamsHash(),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),
+        read_from_cache_hook=read_hook
     )
 
 
