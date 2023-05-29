@@ -9,7 +9,7 @@ from random import random
 from traitlets import Callable
 
 from conjure.decorate import Conjure, Index, WriteNotification, conjure_index, json_conjure, text_conjure
-from conjure.identifier import LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
+from conjure.identifier import FunctionContentIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import JSONDeserializer, JSONSerializer
 from conjure.serve import serve_conjure
 from conjure.storage import LmdbCollection, ensure_str
@@ -43,6 +43,39 @@ class DecorateTests(TestCase):
         if self.process is not None and self.process.is_alive():
             self.process.join(5)
             self.process.terminate()
+
+    def test_can_exercise_read_from_cache_hook(self):
+
+        g = {'value': 0}
+
+        def make_bigger(d: dict) -> dict:
+            d = dict(**d)
+            keys = list(d.keys())
+            for key in keys:
+                d[f'{key}_bigger'] = d[key] * 10
+            return d
+        
+        def read_hook(val):
+            g['value'] += 1
+
+        conj = Conjure(
+            make_bigger,
+            'application/json',
+            self.db,
+            FunctionContentIdentifier(),
+            ParamsHash(),
+            JSONSerializer(),
+            JSONDeserializer(),
+            key_delimiter='_',
+            prefer_cache=True,
+            read_from_cache_hook=read_hook
+        )
+
+        values = conj({'a': 10, 'b': 3})
+        values = conj({'a': 10, 'b': 3})
+        values = conj({'a': 10, 'b': 3})
+
+        self.assertEqual(2, g['value'])
 
     def test_can_force_recompute(self):
 
@@ -279,27 +312,24 @@ class DecorateTests(TestCase):
         @text_conjure(self.db)
         def fetch_content(key):
             return content[key]
-        
+
         fetch_content('a')
         fetch_content('b')
         fetch_content('c')
-
 
         @conjure_index(fetch_content, self.db.index_storage('content_index'))
         def content_index(key: bytes, result: str, *args, **kwargs):
             words = result.split()
             for word in words:
                 yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
-        
 
         content_index.index()
-        
+
         results = content_index.search('sky')
         self.assertEqual(3, len(results))
         best = results[0]
 
         self.assertEqual(content['c'], best['content'])
-
 
     def test_can_index_and_search(self):
 
@@ -326,7 +356,7 @@ class DecorateTests(TestCase):
 
         results = content_index.search('lights')
         self.assertEqual(1, len(results))
-    
+
     def test_can_index_incrementally(self):
 
         content = {
@@ -338,7 +368,6 @@ class DecorateTests(TestCase):
         @text_conjure(self.db)
         def fetch_content(key):
             return content[key]
-        
 
         def content_index_func(key: bytes, result: str, *args, **kwargs):
             words = result.split()
@@ -362,7 +391,6 @@ class DecorateTests(TestCase):
         content_index.index()
         self.assertEqual(3, content_index.keys_processed_in_current_session)
 
-
     def test_can_index_and_rank_by_relevance(self):
 
         content = {
@@ -380,7 +408,6 @@ class DecorateTests(TestCase):
             words = result.split()
             for word in words:
                 yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
-        
 
         fetch_content('a')
         fetch_content('b')

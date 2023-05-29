@@ -120,6 +120,7 @@ class Conjure(object):
         deserializer: Deserializer,
         key_delimiter='_',
         prefer_cache=True,
+        read_from_cache_hook=lambda x: None
     ):
 
         super().__init__()
@@ -132,6 +133,7 @@ class Conjure(object):
         self.serializer = serializer
         self.deserializer = deserializer
         self.prefer_cache = prefer_cache
+        self.read_from_cache_hook = read_from_cache_hook
 
         self.listeners = []
 
@@ -272,6 +274,9 @@ class Conjure(object):
         try:
             raw = self.storage[key]
             obj = self.deserializer.from_bytes(raw)
+
+            self.read_from_cache_hook(obj)
+            
             return obj
         except KeyError:
             return self._compute_and_store(key, *args, **kwargs)
