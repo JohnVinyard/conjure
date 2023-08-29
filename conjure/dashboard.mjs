@@ -679,7 +679,7 @@ class BasicAudioView {
       const midline = height / 2;
 
       const colorIndex = Math.floor(Math.abs(value) * 255);
-      const [r, g, b] = COLOR_MAP[colorIndex];
+      const [r, g, b] = COLOR_MAP[Math.min(255, colorIndex)];
 
       ctxt.fillStyle = `rgb(${r}, ${g}, ${b})`;
       ctxt.fillRect(pos, midline - h / 2, sampleWidth, h);
@@ -1006,7 +1006,9 @@ class SeriesView {
       .attr("transform", `translate(50, -10)`);
 
     // Add X axis
-    const x = scaleLinear().domain([0, size]).range([0, width]);
+    const x = scaleLinear()
+      .domain([0, Math.min(size, this.maxSamples)])
+      .range([0, width]);
 
     svg
       .append("g")
