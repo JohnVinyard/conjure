@@ -475,7 +475,7 @@ def numpy_conjure(
         storage: Collection, 
         content_type=SupportedContentType.Tensor.value,
         read_hook=lambda x: None,
-        identifier: str = None):
+        identifier: bytes = None):
 
     return conjure(
         content_type=content_type,
@@ -490,7 +490,7 @@ def numpy_conjure(
     )
 
 
-def audio_conjure(storage: Collection, identifier: str = None):
+def audio_conjure(storage: Collection, identifier: bytes = None):
 
     return conjure(
         content_type=SupportedContentType.Audio.value,
