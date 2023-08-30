@@ -7,7 +7,7 @@ from urllib.parse import ParseResult
 from markdown import markdown
 from conjure.contenttype import SupportedContentType
 from conjure.identifier import \
-    FunctionContentIdentifier, FunctionIdentifier, LiteralParamsIdentifier, \
+    FunctionContentIdentifier, FunctionIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, \
     ParamsHash, ParamsIdentifier
 from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
@@ -474,12 +474,15 @@ def json_conjure(storage: Collection, tag_deserialized=False):
 def numpy_conjure(
         storage: Collection, 
         content_type=SupportedContentType.Tensor.value,
-        read_hook=lambda x: None):
+        read_hook=lambda x: None,
+        identifier: str = None):
 
     return conjure(
         content_type=content_type,
         storage=storage,
-        func_identifier=FunctionContentIdentifier(),
+        func_identifier=FunctionContentIdentifier() 
+            if identifier is None 
+            else LiteralFunctionIdentifier(identifier),
         param_identifier=ParamsHash(),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),
@@ -487,12 +490,14 @@ def numpy_conjure(
     )
 
 
-def audio_conjure(storage: Collection):
+def audio_conjure(storage: Collection, identifier: str = None):
 
     return conjure(
         content_type=SupportedContentType.Audio.value,
         storage=storage,
-        func_identifier=FunctionContentIdentifier(),
+        func_identifier=FunctionContentIdentifier() 
+            if identifier is None 
+            else LiteralFunctionIdentifier(identifier),
         param_identifier=ParamsHash(),
         serializer=IdentitySerializer(),
         deserializer=IdentityDeserializer(),
