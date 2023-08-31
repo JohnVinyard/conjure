@@ -137,6 +137,9 @@ class Conjure(object):
 
         self.listeners = []
 
+        if '_' in ensure_str(self.identifier):
+            raise ValueError('"_" is not currently supported in literal function identifiers.  TODO: Make this configurable globally')
+
     @property
     def offset(self):
         return self.storage.offset

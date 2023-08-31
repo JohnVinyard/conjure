@@ -3,7 +3,7 @@ from uuid import uuid4 as v4
 import numpy as np
 from conjure.contenttype import SupportedContentType
 
-from conjure.decorate import Conjure, time_series_conjure, conjure
+from conjure.decorate import Conjure, numpy_conjure, time_series_conjure, conjure
 from conjure.identifier import FunctionContentIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import NumpyDeserializer, NumpySerializer
 from conjure.storage import LmdbCollection
@@ -56,6 +56,25 @@ class TestNumpyStorage(TestCase):
 
         self.assertEqual(meta.public_uri, None)
         self.assertEqual('application/octet-stream', meta.content_type)
+    
+
+    def test_can_access_feed_when_using_literal_func_identifier(self):
+
+        @numpy_conjure(
+                self.db, 
+                content_type=SupportedContentType.Tensor, 
+                identifier='static')
+        def get_spec_mag(x: np.ndarray) -> np.ndarray:
+            spec = np.fft.rfft(x, axis=-1, norm='ortho')
+            return np.abs(spec).astype(np.float32)
+        
+
+        arr = np.random.normal(0, 1, (3, 7, 8))
+        get_spec_mag(arr)
+
+        items = list(get_spec_mag.feed())
+        self.assertEqual(len(items), 1)
+
 
     def test_can_store_and_retrieve_array(self):
 
