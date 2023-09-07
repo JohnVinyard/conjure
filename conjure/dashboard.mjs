@@ -1015,6 +1015,7 @@ class SeriesView {
       .attr("transform", `translate(0, ${height})`)
       .attr("class", "axis")
       .call(axisBottom(x));
+    
 
     const min = Math.min(...this.tensor.data);
     const max = Math.max(...this.tensor.data);

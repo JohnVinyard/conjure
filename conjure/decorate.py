@@ -478,7 +478,8 @@ def numpy_conjure(
         storage: Collection, 
         content_type=SupportedContentType.Tensor.value,
         read_hook=lambda x: None,
-        identifier: bytes = None):
+        identifier: bytes = None,
+        param_key: bytes = None):
 
     return conjure(
         content_type=content_type,
@@ -486,7 +487,9 @@ def numpy_conjure(
         func_identifier=FunctionContentIdentifier() 
             if identifier is None 
             else LiteralFunctionIdentifier(identifier),
-        param_identifier=ParamsHash(),
+        param_identifier=ParamsHash() 
+            if param_key is None 
+            else LiteralParamsIdentifier(param_key),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),
         read_from_cache_hook=read_hook
