@@ -496,7 +496,10 @@ def numpy_conjure(
     )
 
 
-def audio_conjure(storage: Collection, identifier: bytes = None):
+def audio_conjure(
+        storage: Collection, 
+        identifier: bytes = None, 
+        param_key: bytes = None):
 
     return conjure(
         content_type=SupportedContentType.Audio.value,
@@ -504,7 +507,9 @@ def audio_conjure(storage: Collection, identifier: bytes = None):
         func_identifier=FunctionContentIdentifier() 
             if identifier is None 
             else LiteralFunctionIdentifier(identifier),
-        param_identifier=ParamsHash(),
+        param_identifier=ParamsHash()
+            if param_key is None
+            else LiteralParamsIdentifier(param_key),
         serializer=IdentitySerializer(),
         deserializer=IdentityDeserializer(),
     )
