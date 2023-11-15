@@ -42,7 +42,7 @@ class TestNumpyStorage(TestCase):
             callable=get_spec_mag,
             content_type='application/octet-stream',
             storage=self.db,
-            func_identifier=LiteralFunctionIdentifier('numpy_test'),
+            func_identifier=LiteralFunctionIdentifier('numpy-test'),
             param_identifier=ParamsHash(),
             serializer=NumpySerializer(),
             deserializer=AllOnesDeserializer())
@@ -86,7 +86,7 @@ class TestNumpyStorage(TestCase):
             callable=get_spec_mag,
             content_type='application/octet-stream',
             storage=self.db,
-            func_identifier=LiteralFunctionIdentifier('numpy_test'),
+            func_identifier=LiteralFunctionIdentifier('numpy-test'),
             param_identifier=ParamsHash(),
             serializer=NumpySerializer(),
             deserializer=AllOnesDeserializer())

@@ -91,10 +91,12 @@ class S3Collection(Collection):
 
     def content_length(self, key) -> int:
         try:
-            resp = self.client.get_object_attribute(
-                Bucket=self.bucket, Key=self.key)
+            resp = self.client.get_object_attributes(
+                Bucket=self.bucket, 
+                Key=ensure_str(key),
+                ObjectAttributes=['ObjectSize'])
             return resp['ObjectSize']
-        except self.client.NoSuchKey:
+        except self.client.exceptions.NoSuchKey:
             raise KeyError(key)
 
     def destroy(self):
