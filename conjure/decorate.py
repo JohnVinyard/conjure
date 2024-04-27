@@ -463,14 +463,15 @@ def text_conjure(storage: Collection):
     )
 
 
-def pickle_conjure(storage: Collection):
+def pickle_conjure(storage: Collection, read_hook = None):
     return conjure(
         content_type='application/octet-stream',
         storage=storage,
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
         serializer=PickleSerializer(),
-        deserializer=PickleDeserializer())
+        deserializer=PickleDeserializer(),
+        read_from_cache_hook=read_hook)
 
 def json_conjure(storage: Collection, tag_deserialized=False):
 
