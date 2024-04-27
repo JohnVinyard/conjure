@@ -11,7 +11,8 @@ from conjure.identifier import \
     ParamsHash, ParamsIdentifier
 from conjure.serialize import \
     Deserializer, IdentityDeserializer, IdentitySerializer, JSONDeserializer, \
-    JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer
+    JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer, \
+    PickleSerializer, PickleDeserializer
 from conjure.storage import Collection, LocalCollectionWithBackup, ensure_bytes, ensure_str
 import inspect
 from urllib.parse import urlunparse
@@ -461,6 +462,15 @@ def text_conjure(storage: Collection):
         deserializer=IdentityDeserializer(),
     )
 
+
+def pickle_conjure(storage: Collection):
+    return conjure(
+        content_type='application/octet-stream',
+        storage=storage,
+        func_identifier=FunctionContentIdentifier(),
+        param_identifier=ParamsHash(),
+        serializer=PickleSerializer(),
+        deserializer=PickleDeserializer())
 
 def json_conjure(storage: Collection, tag_deserialized=False):
 
