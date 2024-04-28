@@ -273,9 +273,6 @@ for (let i = 0; i < COLOR_MAP.length; i++) {
   COLOR_MAP[i][2] = Math.floor(COLOR_MAP[i][2] * 255);
 }
 
-const audioCache = {};
-const context = new (window.AudioContext || window.webkitAudioContext)();
-
 const fetchJSON = async (url) => {
   const resp = await fetch(url);
   return resp.json();
@@ -284,29 +281,6 @@ const fetchJSON = async (url) => {
 const fetchText = async (url) => {
   const resp = await fetch(url);
   return resp.text();
-};
-
-const fetchAudio = (url, context) => {
-  const cached = audioCache[url];
-  if (cached !== undefined) {
-    return cached;
-  }
-  const audioBufferPromise = fetch(url).then(async (resp) => {
-    const buffer = await resp.arrayBuffer();
-    return context.decodeAudioData(buffer);
-  });
-  audioCache[url] = audioBufferPromise;
-  return audioBufferPromise;
-};
-
-const playAudio = (url, context, start, duration, onComplete) => {
-  fetchAudio(url, context).then((audioBuffer) => {
-    const source = context.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(context.destination);
-    source.start(0, start, duration);
-    setTimeout(onComplete, (duration || audioBuffer.duration) * 1000);
-  });
 };
 
 const visit = (typedArray, shape, visitor, scene) => {
@@ -618,73 +592,32 @@ class TextView {
   }
 }
 
+/**
+ * Thin Wrapper around the <audio-view /> web component
+ */
 class BasicAudioView {
-  constructor(elementId, tensor, url, stepSize = 512) {
+  constructor(elementId, url) {
     this.elementId = elementId;
-    this.stepSize = stepSize;
-    this.init(tensor, url);
+    this.init(url);
   }
 
-  init(tensor, url) {
-    this.element.removeEventListener("click", this.clickHandler);
-    this.tensor = tensor;
-    this.url = url;
-    this.playStartTime = null;
-    this.clickHandler = () => {
-      playAudio(url, context, 0, undefined, () => {});
-    };
-    this.element.addEventListener("click", this.clickHandler);
+  init(url) {
+    this.element.setAttribute("src", url);
+    this.element.setAttribute("height", 400);
   }
 
   static async renderURL(url, elementId, existingView = null) {
-    const rawData = await fetchAudio(url, context);
-    const samplerate = rawData.sampleRate;
-    const channelData = rawData.getChannelData(0);
-    const data = new TensorData(channelData, [channelData.length], {
-      samplerate,
-    });
-    const view = existingView || new BasicAudioView(elementId, data, url);
-    view.init(data, url);
+    const view = existingView || new BasicAudioView(elementId, url);
+    view.init(url);
     view.render();
     return view;
-  }
-
-  get samplerate() {
-    return this.tensor.metadata.samplerate;
   }
 
   get element() {
     return document.getElementById(this.elementId);
   }
 
-  render() {
-    const width = this.element.width;
-    const height = this.element.height;
-
-    const nElements = Math.floor(this.tensor.shape[0] / this.stepSize);
-    const sampleWidth = width / nElements;
-
-    const ctxt = this.element.getContext("2d");
-    ctxt.clearRect(0, 0, width, height);
-
-    this.tensor.visit((value, location, scene) => {
-      const [x, y, z] = location;
-
-      if (x % this.stepSize !== 0) {
-        return;
-      }
-
-      const pos = sampleWidth * Math.floor(x / this.stepSize);
-      const h = height * value;
-      const midline = height / 2;
-
-      const colorIndex = Math.floor(Math.abs(value) * 255);
-      const [r, g, b] = COLOR_MAP[Math.min(255, colorIndex)];
-
-      ctxt.fillStyle = `rgb(${r}, ${g}, ${b})`;
-      ctxt.fillRect(pos, midline - h / 2, sampleWidth, h);
-    });
-  }
+  render() {}
 }
 
 class BasicSpectrogramView {
@@ -1015,7 +948,6 @@ class SeriesView {
       .attr("transform", `translate(0, ${height})`)
       .attr("class", "axis")
       .call(axisBottom(x));
-    
 
     const min = Math.min(...this.tensor.data);
     const max = Math.max(...this.tensor.data);
@@ -1502,7 +1434,7 @@ const conjure = async (
     "application/tensor+octet-stream": "canvas",
     "application/tensor-movie+octet-stream": "canvas",
     "application/time-series+octet-stream": "div",
-    "audio/wav": "canvas",
+    "audio/wav": "audio-view",
     "text/plain": "div",
   };
 
