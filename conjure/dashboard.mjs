@@ -604,6 +604,7 @@ class BasicAudioView {
   init(url) {
     this.element.setAttribute("src", url);
     this.element.setAttribute("height", 400);
+    this.element.setAttribute('samples', 256);
   }
 
   static async renderURL(url, elementId, existingView = null) {
