@@ -44,6 +44,7 @@ setup(
         'inotify'
     ],
     setup_requires=[
+        'urllib3<1.27,>=1.25.4'
         'lmdb',
         'boto3',
         'numpy',
