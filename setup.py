@@ -43,6 +43,18 @@ setup(
         'markdown',
         'inotify'
     ],
+    setup_requires=[
+        'lmdb',
+        'boto3',
+        'numpy',
+        'torch',
+        'dill',
+        'falcon',
+        'gunicorn',
+        'requests',
+        'markdown',
+        'inotify'
+    ],
     include_package_data=True,
     package_data={
         '': ['dashboard.html', 'dashboard.mjs', 'imports.json', 'style.css']
