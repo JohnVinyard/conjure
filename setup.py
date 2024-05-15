@@ -31,6 +31,18 @@ setup(
             'conjure-markdown = conjure.conjure_markdown:main'
         ]
     },
+    requirements=[
+        'lmdb',
+        'boto3',
+        'numpy',
+        'torch',
+        'dill',
+        'falcon',
+        'gunicorn',
+        'requests',
+        'markdown',
+        'inotify'
+    ],
     include_package_data=True,
     package_data={
         '': ['dashboard.html', 'dashboard.mjs', 'imports.json', 'style.css']
