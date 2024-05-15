@@ -31,7 +31,7 @@ setup(
             'conjure-markdown = conjure.conjure_markdown:main'
         ]
     },
-    requirements=[
+    install_requires=[
         'lmdb',
         'boto3',
         'numpy',
