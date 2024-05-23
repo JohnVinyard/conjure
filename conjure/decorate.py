@@ -447,12 +447,21 @@ def conjure(
             prefer_cache=prefer_cache,
             read_from_cache_hook=read_from_cache_hook
         )
-
     return deco
 
 
-def text_conjure(storage: Collection):
+def bytes_conjure(storage: Collection, content_type: SupportedContentType, read_hook=None):
+    return conjure(
+        content_type=content_type.value,
+        storage=storage,
+        func_identifier=FunctionContentIdentifier(),
+        param_identifier=ParamsHash(),
+        serializer=IdentitySerializer(),
+        deserializer=IdentityDeserializer(),
+        read_from_cache_hook=read_hook
+    )
 
+def text_conjure(storage: Collection):
     return conjure(
         content_type=SupportedContentType.Text.value,
         storage=storage,
@@ -474,7 +483,6 @@ def pickle_conjure(storage: Collection, read_hook = None):
         read_from_cache_hook=read_hook)
 
 def json_conjure(storage: Collection, tag_deserialized=False):
-
     return conjure(
         content_type='application/json',
         storage=storage,
@@ -527,7 +535,6 @@ def audio_conjure(
 
 
 def time_series_conjure(storage: Collection, name: bytes):
-
     return conjure(
         content_type=SupportedContentType.TimeSeries.value,
         storage=storage,

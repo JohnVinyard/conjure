@@ -7,3 +7,5 @@ class SupportedContentType(Enum):
     TensorMovie = 'application/tensor-movie+octet-stream'
     Audio = 'audio/wav'
     Text = 'text/plain'
+    Image = 'image/png'
+    Video = 'video/mp4'
