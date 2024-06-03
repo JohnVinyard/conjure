@@ -108,8 +108,7 @@ class S3Collection(Collection):
         print(f'deleting bucket {self.bucket}')
         self.client.delete_bucket(Bucket=self.bucket)
 
-    def __delitem__(self, key):
-        raise NotImplementedError()
+    
 
     def _create_bucket(self):
 
@@ -172,6 +171,12 @@ class S3Collection(Collection):
                 contents = resp['Contents']
             else:
                 break
+    
+    def __delitem__(self, key):
+        self.client.delete_object(
+            Bucket=self.bucket,
+            Key=ensure_str(key)
+        )
 
     def put(self, key: Union[bytes, str], value: bytes, content_type: str):
         self.client.put_object(

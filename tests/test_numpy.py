@@ -3,8 +3,9 @@ from uuid import uuid4 as v4
 import numpy as np
 from conjure.contenttype import SupportedContentType
 
-from conjure.decorate import Conjure, numpy_conjure, time_series_conjure, conjure
-from conjure.identifier import FunctionContentIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
+from conjure.decorate import Conjure, numpy_conjure
+from conjure.identifier import FunctionContentIdentifier, \
+    LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import NumpyDeserializer, NumpySerializer
 from conjure.storage import LmdbCollection
 from typing import BinaryIO
@@ -74,6 +75,33 @@ class TestNumpyStorage(TestCase):
 
         items = list(get_spec_mag.feed())
         self.assertEqual(len(items), 1)
+    
+    def can_delete_after_computation(self):
+        def get_spec_mag(x: np.ndarray) -> np.ndarray:
+            spec = np.fft.rfft(x, axis=-1, norm='ortho')
+            return np.abs(spec).astype(np.float32)
+
+        conj = Conjure(
+            callable=get_spec_mag,
+            content_type='application/octet-stream',
+            storage=self.db,
+            func_identifier=LiteralFunctionIdentifier('numpy-test'),
+            param_identifier=ParamsHash(),
+            serializer=NumpySerializer(),
+            deserializer=NumpyDeserializer())
+
+        arr = np.random.normal(0, 1, (3, 7, 8))
+
+        computed_result = conj(arr)
+        retrieved = conj(arr)
+        
+        np.testing.assert_allclose(computed_result, retrieved)
+
+        conj.delete(arr)
+        
+        key = conj.key(arr)
+        
+        self.assertRaises(KeyError, lambda x: conj.get(key))
 
 
     def test_can_store_and_retrieve_array(self):

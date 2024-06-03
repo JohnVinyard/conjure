@@ -22,7 +22,20 @@ class TestExploratory(TestCase):
             remote_bucket=cls.bucket_name,
             is_public=True,
             cors_enabled=True)
+    
+    def test_can_delete(self):
+        key = v4().hex
+        value = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
+        self.db.put(key, value, self.content_type)
 
+        self.assertIn(key, self.db)
+        self.assertIn(key, self.db._remote)
+        
+        del self.db[key]
+        
+        self.assertNotIn(key, self.db)
+        self.assertNotIn(key, self.db._remote)
+        
 
     def test_supports_public_uri(self):
         key = v4().hex
@@ -105,6 +118,19 @@ class TestStorage(TestCase):
 
         read = self.db[key]
         self.assertEqual(read, value)
+    
+    
+    def test_can_delete(self):
+        key = b'key'
+        value = b'value'
+        self.db.put(key, value, self.content_type)
+
+        read = self.db[key]
+        self.assertEqual(read, value)
+        
+        del self.db[key]
+        
+        self.assertNotIn(key, self.db)
 
     def test_reads_from_backup(self):
         key = b'key'

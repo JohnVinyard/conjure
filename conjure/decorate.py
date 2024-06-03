@@ -217,6 +217,7 @@ class Conjure(object):
     def meta(self, *args, **kwargs) -> MetaData:
         key = self.key(*args, **kwargs)
         return self.meta_from_key(key)
+    
 
     @property
     def identifier(self):
@@ -227,6 +228,10 @@ class Conjure(object):
 
     def key(self, *args, **kwargs) -> bytes:
         return f'{self.identifier}{self.key_delimiter}{self.identify_params(*args, **kwargs)}'.encode()
+    
+    def delete(self, *args, **kwargs):
+        key = self.key(*args, **kwargs)
+        del self.storage[key]
 
     def get(self, key):
         raw = self.storage[key]

@@ -301,6 +301,7 @@ class DecorateTests(TestCase):
         retrieved = make_bigger({'a': 10, 'b': 3})
         self.assertEqual(retrieved['a_bigger'], 100)
         self.assertIn('__deserialized', retrieved)
+    
 
     def test_can_create_index_after_initial_function_creation(self):
         content = {
