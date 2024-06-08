@@ -8,7 +8,7 @@ from conjure.identifier import FunctionContentIdentifier, \
     LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import NumpyDeserializer, NumpySerializer
 from conjure.storage import LmdbCollection
-from typing import BinaryIO
+from typing import BinaryIO, Callable
 
 
 class AllOnesDeserializer(NumpyDeserializer):
@@ -102,6 +102,28 @@ class TestNumpyStorage(TestCase):
         key = conj.key(arr)
         
         self.assertRaises(KeyError, lambda x: conj.get(key))
+    
+    def test_get_different_results_when_passing_lambda(self):
+        
+        def do_something(x: np.ndarray, func: Callable[[np.ndarray], np.ndarray]):
+            return func(x)
+        
+        conj = Conjure(
+            callable=do_something,
+            content_type='application/octet-stream',
+            storage=self.db,
+            func_identifier=LiteralFunctionIdentifier('numpy-test'),
+            param_identifier=ParamsHash(),
+            serializer=NumpySerializer(),
+            deserializer=NumpyDeserializer())
+        
+        arr = np.ones((16,))
+        
+        result_1 = conj(arr, lambda x: x * 10)
+        result_2 = conj(arr, lambda x: x * 100)
+        
+        np.testing.assert_allclose(10, result_1)
+        np.testing.assert_allclose(100, result_2)
 
 
     def test_can_store_and_retrieve_array(self):
