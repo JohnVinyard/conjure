@@ -297,38 +297,38 @@ const visit = (typedArray, shape, visitor, scene) => {
   return shapes;
 };
 
-// const dtypeToConstructor = (dtype) => {
-//   if (dtype === "<f4") {
-//     return Float32Array;
-//   }
+const dtypeToConstructor = (dtype) => {
+  if (dtype === "<f4") {
+    return Float32Array;
+  }
 
-//   if (dtype === "<f8") {
-//     return Float64Array;
-//   }
+  if (dtype === "<f8") {
+    return Float64Array;
+  }
 
-//   if (dtype === "<u4") {
-//     return Uint32Array;
-//   }
+  if (dtype === "<u4") {
+    return Uint32Array;
+  }
 
-//   throw new Error(`Type ${dtype} not implemented`);
-// };
+  throw new Error(`Type ${dtype} not implemented`);
+};
 
-// const product = (arr) => {
-//   if (arr.length === 0) {
-//     return 1;
-//   }
-//   return arr.reduce((accum, current) => accum * current, 1);
-// };
+const product = (arr) => {
+  if (arr.length === 0) {
+    return 1;
+  }
+  return arr.reduce((accum, current) => accum * current, 1);
+};
 
-// const strides = (shape) => {
-//   return shape.map((x, index, arr) => product(arr.slice(index + 1)));
-// };
+const strides = (shape) => {
+  return shape.map((x, index, arr) => product(arr.slice(index + 1)));
+};
 
-// const computeIndices = (flatIndex, shape, stride) => {
-//   return shape.map((sh, index) => {
-//     return Math.floor(flatIndex / stride[index]) % sh;
-//   });
-// };
+const computeIndices = (flatIndex, shape, stride) => {
+  return shape.map((sh, index) => {
+    return Math.floor(flatIndex / stride[index]) % sh;
+  });
+};
 
 // class World {
 //   constructor(myCanvas, cameraPosition, enableOrbitControls) {
@@ -434,137 +434,137 @@ const visit = (typedArray, shape, visitor, scene) => {
 //   }
 // }
 
-// class TensorData {
-//   /**
-//    *
-//    * @param {TypedArray} data - flat, typed array
-//    * @param {Array} shape  - the shape of the multidimensional array
-//    * @param {Object} metadata - arbitrary key-value pairs for additional info
-//    */
-//   constructor(data, shape, metadata) {
-//     this.data = data;
-//     this.shape = shape;
-//     this.strides = strides(shape);
-//     this.metadata = metadata;
-//   }
+class TensorData {
+  /**
+   *
+   * @param {TypedArray} data - flat, typed array
+   * @param {Array} shape  - the shape of the multidimensional array
+   * @param {Object} metadata - arbitrary key-value pairs for additional info
+   */
+  constructor(data, shape, metadata) {
+    this.data = data;
+    this.shape = shape;
+    this.strides = strides(shape);
+    this.metadata = metadata;
+  }
 
-//   get nDim() {
-//     return this.shape.length;
-//   }
+  get nDim() {
+    return this.shape.length;
+  }
 
-//   get totalSize() {
-//     return this.data.length;
-//   }
+  get totalSize() {
+    return this.data.length;
+  }
 
-//   get maxValue() {
-//     let max = 0;
+  get maxValue() {
+    let max = 0;
 
-//     for (let i = 0; i < this.totalSize; i++) {
-//       const v = this.data.at(i);
-//       if (v > max) {
-//         max = v;
-//       }
-//     }
+    for (let i = 0; i < this.totalSize; i++) {
+      const v = this.data.at(i);
+      if (v > max) {
+        max = v;
+      }
+    }
 
-//     return max;
-//   }
+    return max;
+  }
 
-//   get minValue() {
-//     let min = Infinity;
+  get minValue() {
+    let min = Infinity;
 
-//     for (let i = 0; i < this.totalSize; i++) {
-//       const v = this.data.at(i);
-//       if (v < min) {
-//         min = v;
-//       }
-//     }
+    for (let i = 0; i < this.totalSize; i++) {
+      const v = this.data.at(i);
+      if (v < min) {
+        min = v;
+      }
+    }
 
-//     return min;
-//   }
+    return min;
+  }
 
-//   toRGBA() {
-//     const arr = new Uint8ClampedArray(this.totalSize * 4);
+  toRGBA() {
+    const arr = new Uint8ClampedArray(this.totalSize * 4);
 
-//     this.visit((value, loc, scene) => {
-//       const [x, y] = loc;
-//       const scaled = Math.floor(value * 255);
-//       const pos =
-//         Math.floor(x * this.strides[0]) + Math.floor(y * this.strides[1]);
-//       arr[pos] = scaled;
-//       arr[pos + 1] = scaled;
-//       arr[pos + 2] = scaled;
-//       arr[pos + 3] = scaled;
-//     });
+    this.visit((value, loc, scene) => {
+      const [x, y] = loc;
+      const scaled = Math.floor(value * 255);
+      const pos =
+        Math.floor(x * this.strides[0]) + Math.floor(y * this.strides[1]);
+      arr[pos] = scaled;
+      arr[pos + 1] = scaled;
+      arr[pos + 2] = scaled;
+      arr[pos + 3] = scaled;
+    });
 
-//     return arr;
-//   }
+    return arr;
+  }
 
-//   getElement(channel) {
-//     // return a new tensor resulting from index
-//     // the first dimension of this one, or, if the
-//     // tensor is one dimensional, return the value
-//     if (this.nDim === 1) {
-//       return this.data.at(channel);
-//     }
+  getElement(channel) {
+    // return a new tensor resulting from index
+    // the first dimension of this one, or, if the
+    // tensor is one dimensional, return the value
+    if (this.nDim === 1) {
+      return this.data.at(channel);
+    }
 
-//     const channelStride = this.strides[0];
+    const channelStride = this.strides[0];
 
-//     const remainingShape = this.shape.slice(1);
-//     const start = channel * channelStride;
-//     const nElements = product(remainingShape);
-//     const newData = this.data.slice(start, start + nElements);
-//     return new TensorData(newData, remainingShape);
-//   }
+    const remainingShape = this.shape.slice(1);
+    const start = channel * channelStride;
+    const nElements = product(remainingShape);
+    const newData = this.data.slice(start, start + nElements);
+    return new TensorData(newData, remainingShape);
+  }
 
-//   getChannelData(channel) {
-//     // TODO: replace this with the more general getElement
-//     const [channelStride, elementStride] = this.strides;
-//     const output = [];
+  getChannelData(channel) {
+    // TODO: replace this with the more general getElement
+    const [channelStride, elementStride] = this.strides;
+    const output = [];
 
-//     const start = channel * channelStride;
-//     const channelSize = this.shape[1];
-//     const end = start + channelSize;
+    const start = channel * channelStride;
+    const channelSize = this.shape[1];
+    const end = start + channelSize;
 
-//     for (let i = start; i < end; i += elementStride) {
-//       output.push(this.data.at(i));
-//     }
-//     return output;
-//   }
+    for (let i = start; i < end; i += elementStride) {
+      output.push(this.data.at(i));
+    }
+    return output;
+  }
 
-//   indices(flat) {
-//     return computeIndices(flat, this.shape, this.strides);
-//   }
+  indices(flat) {
+    return computeIndices(flat, this.shape, this.strides);
+  }
 
-//   visit(visitor, scene) {
-//     return visit(this.data, this.shape, visitor, scene);
-//   }
+  visit(visitor, scene) {
+    return visit(this.data, this.shape, visitor, scene);
+  }
 
-//   static async fromNpy(raw) {
-//     const headerAndData = raw.slice(8);
-//     const headerLen = new Uint16Array(headerAndData.slice(0, 2)).at(0);
-//     const arr = new Uint8Array(headerAndData.slice(2, 2 + headerLen));
-//     const str = String.fromCharCode(...arr);
-//     const dtypePattern = /('descr':\s+)'([^']+)'/;
-//     const shapePattern = /('shape':\s+)(\([^/)]+\))/;
-//     const dtype = str.match(dtypePattern)[2];
-//     const rawShape = str.match(shapePattern)[2];
-//     const hasTrailingComma = rawShape.slice(-2)[0] === ",";
-//     const truncated = rawShape.slice(1, hasTrailingComma ? -2 : -1);
-//     const massagedShape = `[${truncated}]`;
-//     const shape = JSON.parse(massagedShape);
-//     const arrayData = new (dtypeToConstructor(dtype))(
-//       headerAndData.slice(2 + headerLen)
-//     );
-//     return new TensorData(arrayData, shape);
-//   }
+  static async fromNpy(raw) {
+    const headerAndData = raw.slice(8);
+    const headerLen = new Uint16Array(headerAndData.slice(0, 2)).at(0);
+    const arr = new Uint8Array(headerAndData.slice(2, 2 + headerLen));
+    const str = String.fromCharCode(...arr);
+    const dtypePattern = /('descr':\s+)'([^']+)'/;
+    const shapePattern = /('shape':\s+)(\([^/)]+\))/;
+    const dtype = str.match(dtypePattern)[2];
+    const rawShape = str.match(shapePattern)[2];
+    const hasTrailingComma = rawShape.slice(-2)[0] === ",";
+    const truncated = rawShape.slice(1, hasTrailingComma ? -2 : -1);
+    const massagedShape = `[${truncated}]`;
+    const shape = JSON.parse(massagedShape);
+    const arrayData = new (dtypeToConstructor(dtype))(
+      headerAndData.slice(2 + headerLen)
+    );
+    return new TensorData(arrayData, shape);
+  }
 
-//   static async fromURL(url) {
-//     return fetch(url).then(async (resp) => {
-//       const raw = await resp.arrayBuffer();
-//       return TensorData.fromNpy(raw);
-//     });
-//   }
-// }
+  static async fromURL(url) {
+    return fetch(url).then(async (resp) => {
+      const raw = await resp.arrayBuffer();
+      return TensorData.fromNpy(raw);
+    });
+  }
+}
 
 class TextView {
   constructor(elementId, tensor) {
