@@ -14,3 +14,4 @@ from .decorate import \
 from .serve import serve_conjure
 from .timestamp import timestamp_id
 from .contenttype import SupportedContentType
+from .movie import tensor_movie
