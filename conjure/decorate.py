@@ -134,7 +134,9 @@ class Conjure(object):
         self.serializer = serializer
         self.deserializer = deserializer
         self.prefer_cache = prefer_cache
-        self.read_from_cache_hook = read_from_cache_hook
+        
+        # ensure that a read hook is always present
+        self.read_from_cache_hook = read_from_cache_hook or (lambda x: None)
 
         self.listeners = []
 
@@ -273,6 +275,11 @@ class Conjure(object):
             listener(WriteNotification(key, obj, *args, **kwargs))
 
         return obj
+    
+    def result_and_meta(self, *args, **kwargs) -> Tuple[Any, MetaData]:
+        result = self.__call__(*args, **kwargs)
+        meta = self.meta(*args, **kwargs)
+        return result, meta
 
     def __call__(self, *args, **kwargs):
         key = self.key(*args, **kwargs)

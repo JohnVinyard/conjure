@@ -8,12 +8,14 @@ from random import random
 
 from traitlets import Callable
 
-from conjure.decorate import Conjure, Index, WriteNotification, conjure_index, json_conjure, text_conjure
+from conjure.decorate import Conjure, Index, WriteNotification, conjure_index, json_conjure, text_conjure, bytes_conjure
 from conjure.identifier import FunctionContentIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import JSONDeserializer, JSONSerializer
 from conjure.serve import serve_conjure
 from conjure.storage import LmdbCollection, ensure_str
+from conjure.contenttype import SupportedContentType
 from uuid import uuid4 as v4
+import numpy as np
 
 
 def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
@@ -43,6 +45,37 @@ class DecorateTests(TestCase):
         if self.process is not None and self.process.is_alive():
             self.process.join(5)
             self.process.terminate()
+    
+    def test_can_get_result_and_metadata_together(self):
+        @json_conjure(self.db)
+        def make_bigger(d: dict) -> dict:
+            d = dict(**d)
+            keys = list(d.keys())
+            for key in keys:
+                d[f'{key}_bigger'] = d[key] * 10
+            return d
+
+        inp = {'a': 10, 'b': 3}
+        
+        key = make_bigger.key(inp)
+        
+        initial, meta = make_bigger.result_and_meta(inp)
+
+        self.assertEqual(key, meta.key)
+        self.assertEqual('application/json', meta.content_type)
+        self.assertEqual(len(json.dumps(initial).encode()),
+                         meta.content_length)
+        self.assertEqual(None, meta.public_uri)
+    
+    def test_bytes_conjure_does_not_require_read_hook(self):
+        
+        @bytes_conjure(self.db, content_type=SupportedContentType.Tensor)
+        def arr_to_bytes(data: np.ndarray):
+            return bytes(data.data)
+        
+        arr = np.random.normal(0, 1, (16,))
+        a = arr_to_bytes(arr)
+        b = arr_to_bytes(arr)
 
     def test_can_exercise_read_from_cache_hook(self):
 
