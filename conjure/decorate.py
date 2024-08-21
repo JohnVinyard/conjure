@@ -67,7 +67,7 @@ class MetaData(object):
     def conjure_data(self):
         return {
             'key': ensure_str(self.key),
-            'public_uri': urlunparse(self.public_uri),
+            'public_uri': urlunparse(self.public_uri) if self.public_uri else None,
             'content_type': self.content_type,
             'feed_uri': f'/feed/{ensure_str(self.identifier)}',
             'func_name': self.func_name,

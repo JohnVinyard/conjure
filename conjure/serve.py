@@ -14,18 +14,30 @@ from conjure.storage import ensure_bytes, ensure_str
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+def uri(port: int, conj: Conjure, key: Union[str, bytes]) -> ParseResult:
+    # TODO: host should not be hard coded here
+    return urlparse(f'http://localhost:{port}/functions/{conj.identifier}/{ensure_str(key)}')
+
+    
 class ListFunctions(object):
     """
     List all functions served by this server instance
     """
 
-    def __init__(self, functions: List[Conjure]):
+    def __init__(self, functions: List[Conjure], port: int):
         super().__init__()
         self.functions = {f.identifier: f for f in functions}
+        self.port = port
 
     def on_get(self, req: falcon.Request, res: falcon.Response):
-        res.media = list(map(
-            lambda x: {
+        funcs = self.functions.values()
+        results = []
+        for x in funcs:
+            
+            meta = x.most_recent_meta()
+            meta = meta.with_public_uri(uri(self.port, x, meta.key))
+            
+            results.append({
                 'id': x.identifier,
                 'name': x.name,
                 'description': x.description or '',
@@ -33,8 +45,9 @@ class ListFunctions(object):
                 'code': x.code,
                 'url': f'/functions/{x.identifier}',
                 'feed': f'/feed/{x.identifier}',
-                'meta': x.most_recent_meta().conjure_data
-            }, self.functions.values()))
+                'meta': meta.conjure_data    
+            })
+        res.media = results
         res.status = falcon.HTTP_OK
 
 
@@ -144,17 +157,18 @@ class Dashboard(object):
 
     def _uri(self, conj: Conjure, key: Union[str, bytes]) -> ParseResult:
         # TODO: host should not be hard coded here
-        return urlparse(f'http://localhost:{self.port}/functions/{conj.identifier}/{ensure_str(key)}')
+        # return urlparse(f'http://localhost:{self.port}/functions/{conj.identifier}/{ensure_str(key)}')
+        return uri(self.port, conj, key)
 
-    def _item_html(self, conjure: Conjure) -> str:
-        meta = conjure.most_recent_meta()
+    # def _item_html(self, conjure: Conjure) -> str:
+    #     meta = conjure.most_recent_meta()
 
-        if not meta.public_uri:
-            meta = meta.with_public_uri(self._uri(conjure, meta.key))
+    #     if not meta.public_uri:
+    #         meta = meta.with_public_uri(self._uri(conjure, meta.key))
 
-        html = meta.conjure_html()
+    #     html = meta.conjure_html()
 
-        return html
+    #     return html
 
     def on_get(self, req: falcon.Request, res: falcon.Response, function_id=None):
 
@@ -190,7 +204,7 @@ class MutliFunctionApplication(falcon.API):
         self.functions = conjure_funcs
         self.port = port
 
-        self.add_route('/functions', ListFunctions(conjure_funcs))
+        self.add_route('/functions', ListFunctions(conjure_funcs, port))
 
         self.add_route('/functions/{identifier}', Function(conjure_funcs, indexes))
 
