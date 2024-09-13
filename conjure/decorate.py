@@ -170,8 +170,8 @@ class Conjure(object):
         return inspect.getsource(self.callable)
 
     @property
-    def name(self):
-        return self.func_identifier.derive_name(self.callable)
+    def name(self) -> str:
+        return ensure_str(self.func_identifier.derive_name(self.callable))
 
     @property
     def description(self):
