@@ -1,4 +1,4 @@
-from typing import Union, Callable
+from typing import Union, Callable, List
 from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure
 from conjure.storage import Collection, ensure_bytes
 from conjure.serialize import \
@@ -27,3 +27,16 @@ def logger(
         param_identifier=ParamsHash(),
         serializer=serializer,
         deserializer=deserializer)
+
+
+def loggers(
+        names: List[str],
+        content_type: str,
+        func: Callable,
+        collection: Collection,
+        serializer: Union[Serializer, None] = IdentitySerializer(),
+        deserializer: Union[Deserializer, None] = IdentityDeserializer()) -> List[Conjure]:
+    return [
+        logger(name, content_type, func, collection, serializer, deserializer)
+        for name in names
+    ]
