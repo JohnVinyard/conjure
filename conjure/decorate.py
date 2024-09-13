@@ -150,12 +150,8 @@ class Conjure(object):
     def feed(self, offset: Union[bytes, str] = None):
         final_offset = offset or self.identifier
 
-        print('FINAL OFFSET', final_offset)
-
         search = ensure_bytes(self.identifier) if isinstance(
             final_offset, bytes) else ensure_str(self.identifier)
-
-        print('SEARCH', search)
 
         if not final_offset.startswith(search):
             raise ValueError(

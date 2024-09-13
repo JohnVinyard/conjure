@@ -98,6 +98,8 @@ class S3Collection(Collection):
             return resp['ObjectSize']
         except self.client.exceptions.NoSuchKey:
             raise KeyError(key)
+        except Exception:
+            return 0
 
     def destroy(self):
         # first, delete all keys
