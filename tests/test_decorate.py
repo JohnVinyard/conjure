@@ -8,6 +8,7 @@ from random import random
 
 from traitlets import Callable
 
+from build.lib.conjure import IdentitySerializer, IdentityDeserializer, FunctionNameIdentifier
 from conjure.decorate import Conjure, Index, WriteNotification, conjure_index, json_conjure, text_conjure, bytes_conjure
 from conjure.identifier import FunctionContentIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import JSONDeserializer, JSONSerializer
@@ -76,6 +77,38 @@ class DecorateTests(TestCase):
         arr = np.random.normal(0, 1, (16,))
         a = arr_to_bytes(arr)
         b = arr_to_bytes(arr)
+
+    def test_honors_func_identifier(self):
+
+        def arr_to_bytes(data: np.ndarray):
+            return bytes(data.data)
+
+        conj = Conjure(
+            callable=arr_to_bytes,
+            content_type='application/octet-stream',
+            storage=self.db,
+            func_identifier=LiteralFunctionIdentifier('funcname'),
+            param_identifier=ParamsHash(),
+            serializer=IdentitySerializer(),
+            deserializer=IdentityDeserializer())
+
+        self.assertEqual(conj.name, 'funcname')
+
+    def test_honors_func_identifier_when_using_func_name(self):
+
+        def arr2bytes(data: np.ndarray):
+            return bytes(data.data)
+
+        conj = Conjure(
+            callable=arr2bytes,
+            content_type='application/octet-stream',
+            storage=self.db,
+            func_identifier=FunctionNameIdentifier(),
+            param_identifier=ParamsHash(),
+            serializer=IdentitySerializer(),
+            deserializer=IdentityDeserializer())
+
+        self.assertEqual(conj.name, 'arr2bytes')
 
     def test_can_exercise_read_from_cache_hook(self):
 

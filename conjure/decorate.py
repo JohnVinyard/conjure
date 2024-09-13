@@ -171,7 +171,7 @@ class Conjure(object):
 
     @property
     def name(self):
-        return self.callable.__name__
+        return self.func_identifier.derive_name(self.callable)
 
     @property
     def description(self):
