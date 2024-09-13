@@ -605,6 +605,7 @@ class BasicAudioView {
     this.element.setAttribute("src", url);
     this.element.setAttribute("height", 400);
     this.element.setAttribute("samples", 256);
+    this.element.setAttribute("controls", true);
   }
 
   static async renderURL(url, elementId, existingView = null) {
@@ -620,7 +621,6 @@ class BasicAudioView {
 
   render() {}
 }
-
 
 class BasicSpectrogramView {
   constructor(elementId, url) {
