@@ -16,3 +16,4 @@ from .timestamp import timestamp_id
 from .contenttype import SupportedContentType
 from .movie import tensor_movie
 from .logger import logger, loggers
+from .helpers import two_dim_matrix_display_bytes
