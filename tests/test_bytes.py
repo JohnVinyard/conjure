@@ -16,6 +16,32 @@ class BytesConjureTests(TestCase):
 
     def tearDown(self) -> None:
         self.db.destroy()
+    
+    
+    def test_can_use_arbitrary_string_valued_content_type(self):
+        counter = { 'c': 0 }
+        
+        def read_hook(*args, **kwargs):
+            counter['c'] += 1
+        
+        
+        @bytes_conjure(self.db, content_type='image/png', read_hook=read_hook)
+        def image(arr: np.ndarray):
+            io = BytesIO()
+            plt.matshow(arr)
+            plt.savefig(io)
+            io.seek(0)
+            return io.read()
+        
+        
+        data = np.random.normal(0, 1, (128, 128))
+        
+        image_bytes = image(data)
+        self.assertIsInstance(image_bytes, bytes)
+        self.assertEqual(counter['c'], 0)
+        image_bytes = image(data)
+        self.assertIsInstance(image_bytes, bytes)
+        self.assertEqual(counter['c'], 1)
         
     def test_can_serialize_and_deserialize_image_bytes(self):
         

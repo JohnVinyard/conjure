@@ -462,9 +462,15 @@ def conjure(
     return deco
 
 
-def bytes_conjure(storage: Collection, content_type: SupportedContentType, read_hook=None):
+def bytes_conjure(storage: Collection, content_type: Union[SupportedContentType, str], read_hook=None):
+    
+    try:
+        content_type = content_type.value
+    except AttributeError:
+        pass
+    
     return conjure(
-        content_type=content_type.value,
+        content_type=content_type,
         storage=storage,
         func_identifier=FunctionContentIdentifier(),
         param_identifier=ParamsHash(),
