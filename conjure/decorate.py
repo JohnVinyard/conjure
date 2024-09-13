@@ -150,8 +150,13 @@ class Conjure(object):
     def feed(self, offset: Union[bytes, str] = None):
         final_offset = offset or self.identifier
 
+        print('FINAL OFFSET', final_offset)
+
         search = ensure_bytes(self.identifier) if isinstance(
             final_offset, bytes) else ensure_str(self.identifier)
+
+        print('SEARCH', search)
+
         if not final_offset.startswith(search):
             raise ValueError(
                 f'offset must start with {self.identifier} but was {offset}')
@@ -170,8 +175,12 @@ class Conjure(object):
         return inspect.getsource(self.callable)
 
     @property
-    def name(self) -> str:
-        return ensure_str(self.func_identifier.derive_name(self.callable))
+    def name(self):
+        return self.func_identifier.derive_name(self.callable)
+
+    @property
+    def identifier(self):
+        return self.func_identifier.derive_name(self.callable)
 
     @property
     def description(self):
@@ -220,10 +229,6 @@ class Conjure(object):
         key = self.key(*args, **kwargs)
         return self.meta_from_key(key)
     
-
-    @property
-    def identifier(self):
-        return self.func_identifier.derive_name(self.callable)
 
     def identify_params(self, *args, **kwargs):
         return self.param_identifier.derive_name(*args, **kwargs)

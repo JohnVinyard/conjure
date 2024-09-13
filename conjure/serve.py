@@ -26,14 +26,15 @@ class ListFunctions(object):
 
     def __init__(self, functions: List[Conjure], port: int):
         super().__init__()
+
         self.functions = {f.identifier: f for f in functions}
         self.port = port
 
     def on_get(self, req: falcon.Request, res: falcon.Response):
         funcs = self.functions.values()
         results = []
+
         for x in funcs:
-            
             meta = x.most_recent_meta()
             meta = meta.with_public_uri(uri(self.port, x, meta.key))
             
@@ -263,5 +264,5 @@ def serve_conjure(
 
     p = multiprocessing.Process(target=run, args=())
     p.start()
-    print(f'Running conjure server for funcs ${", ".join(c.name for c in conjure_funcs)} on port ${port}')
+    print(f'Running conjure server for funcs ${", ".join(ensure_str(c.name) for c in conjure_funcs)} on port ${port}')
     return p

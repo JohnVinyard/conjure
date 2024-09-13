@@ -6,7 +6,7 @@ from conjure.serialize import \
 
 
 def logger(
-        name: Union[str, bytes],
+        name: str,
         content_type: str,
         func: Callable,
         collection: Collection,
@@ -17,8 +17,6 @@ def logger(
     results of computations when repeated calls are likely, but instead for
     cases where we primarily care about the storage side effect.
     """
-
-    name = ensure_bytes(name)
     return Conjure(
         callable=func,
         content_type=content_type,
