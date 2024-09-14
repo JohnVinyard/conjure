@@ -37,7 +37,7 @@ def build_template(page_title: str, content: str, toc: str):
                 <script type="text/javascript">
                     setInterval(() => {{
                         window.location.reload();
-                    }}, 10000);
+                    }}, 30000);
                 </script>
             </head>
             <body>
