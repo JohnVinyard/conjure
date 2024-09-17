@@ -2,7 +2,7 @@ from hashlib import sha1
 import json
 from typing import Callable
 import dill as pickle
-
+import torch
 
 class FunctionIdentifier(object):
     def __init__(self):
@@ -77,10 +77,26 @@ class ParamsHash(ParamsIdentifier):
     def __init__(self):
         super().__init__()
 
+    def _get_underlying_data(self, value):
+        """
+        Wraps a special case for torch.Tensor values, which, unlike numpy arrays, do not have
+        a consistent hash value for identical/equal arrays or tensors of values
+        """
+
+        if isinstance(value, torch.Tensor):
+            return value.data.cpu().numpy()
+        return value
+
+
     def _hash_args(self, *args, **kwargs):
         args_hash = sha1()
-        args_hash.update(pickle.dumps(args))
-        args_hash.update(pickle.dumps(kwargs))
+
+        transformed_args = list(map(self._get_underlying_data, args))
+        transformed_kwargs = {k: self._get_underlying_data(v) for k, v in kwargs.items()}
+
+        args_hash.update(pickle.dumps(transformed_args))
+        args_hash.update(pickle.dumps(transformed_kwargs))
+
         args_hash = args_hash.hexdigest()
         return args_hash
 

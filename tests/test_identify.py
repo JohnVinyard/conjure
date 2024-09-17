@@ -1,6 +1,7 @@
 import json
 from unittest import TestCase
-
+import numpy as np
+import torch
 from conjure.identifier import FunctionContentIdentifier, FunctionNameIdentifier, ParamsHash, ParamsJSON
 
 
@@ -17,6 +18,29 @@ class TestParamsIdentifier(TestCase):
         a = identifier.derive_name(1, 'a', [], key1=set(), key2=dict(pony=10))
         b = identifier.derive_name(1, 'a', [], key1=set(), key2=dict(pony=11))
         self.assertNotEqual(a, b)
+
+    def test_equivalent_numpy_arrays_produce_identical_names(self):
+        identifier = ParamsHash()
+
+        a = np.random.normal(0, 1, (3, 4, 5))
+        b = a.copy()
+
+        params_a = identifier.derive_name(1, 'a', [], key1=set(), key2=a)
+        params_b = identifier.derive_name(1, 'a', [], key1=set(), key2=b)
+        self.assertEqual(params_a, params_b)
+
+    def test_equivalent_pytorch_tensors_produce_identical_names(self):
+        identifier = ParamsHash()
+
+        a = np.random.normal(0, 1, (3, 4, 5))
+        b = a.copy()
+
+        a = torch.from_numpy(a)
+        b = torch.from_numpy(b)
+
+        params_a = identifier.derive_name(1, 'a', [], key1=set(), key2=a)
+        params_b = identifier.derive_name(1, 'a', [], key1=set(), key2=b)
+        self.assertEqual(params_a, params_b)
     
     def test_json_namer_raises_for_args(self):
         identifier = ParamsJSON()
@@ -30,6 +54,7 @@ class TestParamsIdentifier(TestCase):
         self.assertIsInstance(hydrated['key1'], list)
         self.assertEqual(len(hydrated['key1']), 0)
         self.assertEqual(hydrated['key2'], 'string')
+
 
 
 class TestFunctionIdentifier(TestCase):
