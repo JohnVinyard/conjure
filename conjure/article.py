@@ -125,12 +125,19 @@ class CitationComponent:
 
 
 class AudioComponent:
-    def __init__(self, src: str, height: int, scale: int = 1, controls: bool = True):
+    def __init__(
+            self, src: str, 
+            height: int, 
+            scale: int = 1, 
+            controls: bool = True, 
+            samples: int = 256):
+        
         super().__init__()
         self.src = src
         self.height = height
         self.scale = scale
         self.controls = controls
+        self.samples = samples
 
     def render(self, target: RenderTarget):
         if target == 'html':
@@ -145,6 +152,7 @@ class AudioComponent:
         <audio-view
             src="{self.src}"
             height="{self.height}"
+            samples="{self.samples}"
             scale="{self.scale}"
             {'controls' if self.controls else ''}
         ></audio-view>'''

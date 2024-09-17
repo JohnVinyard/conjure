@@ -104,8 +104,9 @@ class S3Collection(Collection):
     def destroy(self):
         # first, delete all keys
         for key in self.iter_prefix(''):
-            print(f'deleting key {key}')
-            self.client.delete_object(Bucket=self.bucket, Key=key)
+            k = ensure_str(key)
+            print(f'deleting key {k}')
+            self.client.delete_object(Bucket=self.bucket, Key=k)
 
         print(f'deleting bucket {self.bucket}')
         self.client.delete_bucket(Bucket=self.bucket)
