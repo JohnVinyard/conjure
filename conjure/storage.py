@@ -101,17 +101,17 @@ class S3Collection(Collection):
         except Exception:
             return 0
 
-    def destroy(self):
-        # first, delete all keys
-        for key in self.iter_prefix(''):
+    def destroy(self, prefix: str = ''):
+        # first, delete all keys with the provided prefix
+        for key in self.iter_prefix(prefix):
             k = ensure_str(key)
             print(f'deleting key {k}')
             self.client.delete_object(Bucket=self.bucket, Key=k)
 
-        print(f'deleting bucket {self.bucket}')
-        self.client.delete_bucket(Bucket=self.bucket)
+        if prefix == '':
+            print(f'deleting bucket {self.bucket}')
+            self.client.delete_bucket(Bucket=self.bucket)
 
-    
 
     def _create_bucket(self):
 
@@ -158,7 +158,11 @@ class S3Collection(Collection):
             StartAfter=ensure_str(start_key),
             Prefix=ensure_str(prefix) if prefix is not None else '',
         )
-        contents = resp['Contents']
+
+        try:
+            contents = resp['Contents']
+        except KeyError:
+            return
 
         while True:
             for content in contents:

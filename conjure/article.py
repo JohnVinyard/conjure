@@ -27,14 +27,39 @@ def build_template(page_title: str, content: str, toc: str):
                     body {{
                         font-family: "Gowun Batang", serif;
                         margin: 20px 100px;
+                        color: #333;
+                        background-color: #f0f0f0;
                     }}
                     .back-to-top {{
                         position: fixed;
                         bottom: 20px;
                         right: 20px;
-                        background-color: #eee;
+                        background-color: #333;
+                        color: #f0f0f0;
                         padding: 10px;
-                        font-size: 0.8em;
+                        font-size: 0.9em;
+                    }}
+                    img {{
+                        width: 100%;
+                    }}
+                    ul {{
+                        list-style-type: none;
+                        padding-inline-start: 20px;
+                        font-size: 20px;
+                    }}
+                    a {{
+                        color: #660000;
+                    }}
+                    a:visited {{
+                        color: #000066;
+                    }}
+                    caption {{
+                        text-decoration: underline;
+                        font-size: 0.6em;
+                    }}
+                    blockquote {{
+                        background-color: #d5d5d5;
+                        padding: 2px 10px;
                     }}
                 </style>
                 <script type="text/javascript">
@@ -88,7 +113,7 @@ class ImageComponent:
 
     def html(self):
         return f'''
-        <img src="{self.src}" height="{self.height}"></img>
+        <img src="{self.src}"></img>
         '''
 
     def markdown(self):
@@ -164,6 +189,33 @@ class AudioComponent:
         raise NotImplementedError('This component cannot be converted to markdown')
 
 
+class CompositeComponent:
+    def __init__(self, *args):
+        super().__init__()
+        self.components = args
+
+    def render(self, target: RenderTarget):
+        if target == 'html':
+            return self.html()
+        elif target == 'markdown':
+            return self.markdown()
+        else:
+            raise ValueError(f'Unknown render type "{target}"')
+
+    def _iter_rendered_content(self):
+        for component in self.components:
+            if isinstance(component, str):
+                yield markdown.markdown(component)
+            else:
+                yield component.html()
+
+    def html(self) -> str:
+        return '\n'.join(self._iter_rendered_content())
+
+    def markdown(self):
+        raise NotImplementedError('This component cannot be converted to markdown')
+
+
 def chunk_article(filepath: str, target: RenderTarget, **kwargs) -> Iterable[Tuple[str, int, int]]:
     with open(filepath, 'rb') as f:
         structure = tokenize.tokenize(f.readline)
@@ -211,7 +263,11 @@ header_pattern = r'<a\sid=\"(?P<id>[^\"]+)\".*\n\s*<(?P<header>h\d)>(?P<title>[^
 pattern = r'(?P<x><h\d>(?P<title>[^<]+)</h\d>\n)'
 
 
-def generate_table_of_contents(html: str, title: str = 'Table of Contents') -> Tuple[str, str]:
+def generate_table_of_contents(
+        html: str,
+        title: str = 'Table of Contents',
+        max_depth: int = 2) -> Tuple[str, str]:
+
     # first, add anchor links to the html
     p = re.compile(pattern)
 
@@ -232,13 +288,19 @@ def generate_table_of_contents(html: str, title: str = 'Table of Contents') -> T
     markdown_content = f'''
 # {title}
 
+<caption>Table of Contents</caption>
+
 '''
+    tab = '\t'
 
     for match in p.finditer(html):
         d = match.groupdict()
         _id, tag, title = d['id'], d['header'], d['title']
         indent = int(tag[-1:]) - 1
-        tab = '\t'
+
+        if indent > max_depth:
+            continue
+
         entry = f'{tab * indent} - [{title}](#{_id})\n'
         markdown_content += entry
 
@@ -250,6 +312,7 @@ def conjure_article(
         filepath: str,
         target: RenderTarget,
         title: Union[str, None] = None,
+        max_depth: int = 1,
         **kwargs: Dict[str, Any]):
     final_chunks = classify_chunks(filepath, target, **kwargs)
 
@@ -265,7 +328,8 @@ def conjure_article(
         elif t == 'MARKDOWN':
             content += f'\n{new_content}\n'
 
-    content, toc = generate_table_of_contents(content, title=title)
+    content, toc = generate_table_of_contents(
+        content, title=title, max_depth=max_depth)
 
     name, _ = os.path.splitext(filepath)
 
