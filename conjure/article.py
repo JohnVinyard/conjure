@@ -1,5 +1,5 @@
 import os.path
-from typing import Any, Dict, Iterable, Literal, Tuple
+from typing import Any, Dict, Iterable, Literal, Tuple, Union
 import tokenize
 import markdown
 from io import BytesIO
@@ -19,10 +19,13 @@ def build_template(page_title: str, content: str, toc: str):
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <meta http-equiv="X-UA-Compatible" content="ie=edge">
                 <title>{page_title}</title>
+                <link rel="preconnect" href="https://fonts.googleapis.com">
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
                 <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.11/build/components/bundle.js"></script>
                 <style>
                     body {{
-                        font-family: Arial;
+                        font-family: "Gowun Batang", serif;
                         margin: 20px 100px;
                     }}
                     .back-to-top {{
@@ -126,12 +129,12 @@ class CitationComponent:
 
 class AudioComponent:
     def __init__(
-            self, src: str, 
-            height: int, 
-            scale: int = 1, 
-            controls: bool = True, 
+            self, src: str,
+            height: int,
+            scale: int = 1,
+            controls: bool = True,
             samples: int = 256):
-        
+
         super().__init__()
         self.src = src
         self.height = height
@@ -208,7 +211,7 @@ header_pattern = r'<a\sid=\"(?P<id>[^\"]+)\".*\n\s*<(?P<header>h\d)>(?P<title>[^
 pattern = r'(?P<x><h\d>(?P<title>[^<]+)</h\d>\n)'
 
 
-def generate_table_of_contents(html: str) -> Tuple[str, str]:
+def generate_table_of_contents(html: str, title: str = 'Table of Contents') -> Tuple[str, str]:
     # first, add anchor links to the html
     p = re.compile(pattern)
 
@@ -226,8 +229,8 @@ def generate_table_of_contents(html: str) -> Tuple[str, str]:
     # then scan all the anchor link and header pairs to produce a table
     # of contents
 
-    markdown_content = '''
-# Table of Contents
+    markdown_content = f'''
+# {title}
 
 '''
 
@@ -246,6 +249,7 @@ def generate_table_of_contents(html: str) -> Tuple[str, str]:
 def conjure_article(
         filepath: str,
         target: RenderTarget,
+        title: Union[str, None] = None,
         **kwargs: Dict[str, Any]):
     final_chunks = classify_chunks(filepath, target, **kwargs)
 
@@ -261,7 +265,7 @@ def conjure_article(
         elif t == 'MARKDOWN':
             content += f'\n{new_content}\n'
 
-    content, toc = generate_table_of_contents(content)
+    content, toc = generate_table_of_contents(content, title=title)
 
     name, _ = os.path.splitext(filepath)
 
