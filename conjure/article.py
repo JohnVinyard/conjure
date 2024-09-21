@@ -1,6 +1,8 @@
 import os.path
 from typing import Any, Dict, Iterable, Literal, Tuple, Union
 import tokenize
+from urllib.parse import ParseResult
+
 import markdown
 from io import BytesIO
 import re
@@ -98,9 +100,14 @@ class BytesContext:
 
 
 class ImageComponent:
-    def __init__(self, src: str, height: int):
+    def __init__(self, src: Union[str, ParseResult], height: int):
         super().__init__()
-        self.src = src
+
+        try:
+            self.src = src.geturl()
+        except AttributeError:
+            self.src = src
+
         self.height = height
 
     def render(self, target: RenderTarget):
@@ -154,14 +161,19 @@ class CitationComponent:
 
 class AudioComponent:
     def __init__(
-            self, src: str,
+            self, src: Union[str, ParseResult],
             height: int,
             scale: int = 1,
             controls: bool = True,
             samples: int = 256):
 
         super().__init__()
-        self.src = src
+
+        try:
+            self.src = src.geturl()
+        except AttributeError:
+            self.src = src
+
         self.height = height
         self.scale = scale
         self.controls = controls
