@@ -21,11 +21,12 @@ def build_template(page_title: str, content: str, toc: str):
                 <title>{page_title}</title>
                 <link rel="preconnect" href="https://fonts.googleapis.com">
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-                <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+                <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
+                
                 <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.11/build/components/bundle.js"></script>
                 <style>
                     body {{
-                        font-family: "Gowun Batang", serif;
+                        font-family: "EB Garamond", serif;
                         margin: 20px 100px;
                     }}
                     .back-to-top {{
