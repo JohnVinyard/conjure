@@ -64,11 +64,6 @@ def build_template(page_title: str, content: str, toc: str):
                         padding: 2px 10px;
                     }}
                 </style>
-                <script type="text/javascript">
-                    setInterval(() => {{
-                        window.location.reload();
-                    }}, 30000);
-                </script>
             </head>
             <body>
                 {toc}
