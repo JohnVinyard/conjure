@@ -28,9 +28,10 @@ def build_template(page_title: str, content: str, toc: str):
                 <style>
                     body {{
                         font-family: "Gowun Batang", serif;
-                        margin: 20px 100px;
+                        margin: 5vh 5vw;
                         color: #333;
                         background-color: #f0f0f0;
+                        font-size: 1.1em;
                     }}
                     .back-to-top {{
                         position: fixed;
@@ -197,9 +198,9 @@ class AudioComponent:
 
 
 class CompositeComponent:
-    def __init__(self, *args):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.components = args
+        self.components: Dict = kwargs
 
     def render(self, target: RenderTarget):
         if target == 'html':
@@ -209,8 +210,11 @@ class CompositeComponent:
         else:
             raise ValueError(f'Unknown render type "{target}"')
 
+    def __getitem__(self, key):
+        return self.components[key]
+
     def _iter_rendered_content(self):
-        for component in self.components:
+        for component in self.components.values():
             if isinstance(component, str):
                 yield markdown.markdown(component)
             else:
@@ -223,12 +227,20 @@ class CompositeComponent:
         raise NotImplementedError('This component cannot be converted to markdown')
 
 
-def chunk_article(filepath: str, target: RenderTarget, **kwargs) -> Iterable[Tuple[str, int, int]]:
+def chunk_article(
+        filepath: str,
+        target: RenderTarget,
+        **kwargs) -> Iterable[Tuple[str, int, int]]:
+
     with open(filepath, 'rb') as f:
         structure = tokenize.tokenize(f.readline)
 
+        def is_markdown_section(x: str):
+            return x.startswith('"""[markdown]') or x.startswith('f"""[markdown]')
+
+
         for item in structure:
-            if item.type == tokenize.STRING and item.string.startswith('"""[markdown]'):
+            if item.type == tokenize.STRING and is_markdown_section(item.string):
                 no_quotes = item.string.replace('"""', '')
                 no_markdown = no_quotes.replace('[markdown]', '')
                 markup = markdown.markdown(no_markdown)
@@ -237,11 +249,18 @@ def chunk_article(filepath: str, target: RenderTarget, **kwargs) -> Iterable[Tup
             elif item.type == tokenize.COMMENT:
                 content = item.string.replace('# ', '')
                 try:
-                    component = kwargs[content]
+                    segments = content.split('.')
+                    lookup = kwargs
+
+                    for segment in segments:
+                        component = lookup[segment]
+                        lookup = component
+
+                    # component = kwargs[content]
                     rendered = component.render(target)
                     start, end = item.start[0], item.end[0] + 1
                     yield (rendered, start, end)
-                except KeyError:
+                except (KeyError, AttributeError):
                     continue
 
 
@@ -265,9 +284,9 @@ def classify_chunks(filepath: str, target: RenderTarget, **kwargs) -> Iterable[T
     yield ('CODE', '\n'.join(lines[current_line:]))
 
 
-header_pattern = r'<a\sid=\"(?P<id>[^\"]+)\".*\n\s*<(?P<header>h\d)>(?P<title>[^<]+)'
+header_pattern = r'<a\sid=\"(?P<id>[^\"]+)\".*\n\s*<(?P<header>h\d)>(?P<title>[^\n]+)'
 
-pattern = r'(?P<x><h\d>(?P<title>[^<]+)</h\d>\n)'
+pattern = r'(?P<x><h\d>(?P<title>.+)<\/h\d>\n)'
 
 
 def generate_table_of_contents(
@@ -342,7 +361,7 @@ def conjure_article(
 
     filename = f'{name}.html'
     with open(filename, 'w') as f:
-        f.write(build_template('Blah', content, toc))
+        f.write(build_template(title, content, toc))
 
     wd = os.getcwd()
     full_path = os.path.join(wd, filename)
