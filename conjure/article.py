@@ -96,9 +96,10 @@ class BytesContext:
 
 
 class ImageComponent:
-    def __init__(self, src: Union[str, ParseResult], height: int):
+    def __init__(self, src: Union[str, ParseResult], height: int, title: str = None):
         super().__init__()
 
+        self.title = title or 'image'
         try:
             self.src = src.geturl()
         except AttributeError:
@@ -120,7 +121,7 @@ class ImageComponent:
         '''
 
     def markdown(self):
-        raise NotImplementedError('This component cannot be converted to markdown')
+        return f'''![{self.title}]({self.src})'''
 
 
 class CitationComponent:
@@ -152,7 +153,16 @@ class CitationComponent:
         '''
 
     def markdown(self):
-        raise NotImplementedError('This component cannot be converted to markdown')
+        return f'''
+```
+@misc{{{self.tag}
+    author = {self.author},
+    title = {self.header},
+    url = {self.url}
+    year = {self.year}
+}}
+```
+        '''
 
 
 class AudioComponent:
@@ -194,7 +204,10 @@ class AudioComponent:
         ></audio-view>'''
 
     def markdown(self):
-        raise NotImplementedError('This component cannot be converted to markdown')
+        """
+        Since there is no markdown-native audio component, we simply include a link
+        """
+        return f'''[{self.src}]({self.src})'''
 
 
 class CompositeComponent:
@@ -213,18 +226,18 @@ class CompositeComponent:
     def __getitem__(self, key):
         return self.components[key]
 
-    def _iter_rendered_content(self):
+    def _iter_rendered_content(self, target: RenderTarget):
         for component in self.components.values():
             if isinstance(component, str):
                 yield markdown.markdown(component)
             else:
-                yield component.html()
+                yield component.render(target)
 
     def html(self) -> str:
-        return '\n'.join(self._iter_rendered_content())
+        return '\n'.join(self._iter_rendered_content('html'))
 
     def markdown(self):
-        raise NotImplementedError('This component cannot be converted to markdown')
+        return '\n'.join(self._iter_rendered_content('markdown'))
 
 
 def chunk_article(
