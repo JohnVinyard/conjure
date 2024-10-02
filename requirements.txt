@@ -8,3 +8,5 @@ gunicorn
 requests
 markdown
 inotify
+matplotlib
+soundfile
