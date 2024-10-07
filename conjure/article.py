@@ -117,7 +117,7 @@ class ImageComponent:
 
     def html(self):
         return f'''
-        <img src="{self.src}"></img>
+        <img src="{self.src}" height="{self.height}"></img>
         '''
 
     def markdown(self):

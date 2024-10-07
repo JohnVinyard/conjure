@@ -18,6 +18,13 @@ class TestArticle(TestCase):
         result = c.render('markdown')
         self.assertIsNotNone(result)
 
+
+    def test_image_html_includes_height_attribute(self):
+        c = ImageComponent('https://example.org', 200)
+        result = c.render('html')
+        self.assertIsNotNone(result)
+        self.assertIn('height', result)
+
     def test_can_render_html_for_sound(self):
         c = AudioComponent('https://example.org', 200)
         result = c.render('html')
