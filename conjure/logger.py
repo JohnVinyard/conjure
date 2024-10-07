@@ -15,8 +15,6 @@ def display_matrix(
         arr: Union[torch.Tensor, np.ndarray],
         cmap: str = 'gray',
         invert: bool = False) -> bytes:
-    if arr.ndim > 2:
-        raise ValueError('Only two-dimensional arrays are supported')
 
     if isinstance(arr, torch.Tensor):
         arr = arr.data.cpu().numpy()
