@@ -34,6 +34,12 @@ def display_matrix(
     return bio.read()
 
 
+def create_matrix_displayer_with_cmap(cmap: str) -> Callable:
+    def display_matrix_with_cmap(arr):
+        return display_matrix(arr, cmap=cmap)
+    return display_matrix_with_cmap
+
+
 def encode_audio(
         x: Union[torch.Tensor, np.ndarray],
         samplerate: int = 22050,
@@ -111,6 +117,18 @@ class Logger(object):
             l = logger(key, content_type, func, self.collection)
             self.loggers[key] = l
         return l
+
+    def log_matrix_with_cmap(
+            self,
+            key: str,
+            matrix: Union[np.ndarray, torch.Tensor],
+            cmap: str):
+        l = self._get_or_create_logger(
+            key,
+            'image/png',
+            create_matrix_displayer_with_cmap(cmap))
+        rm = l.result_and_meta(matrix)
+        return rm
 
     def log_matrix(
             self,
