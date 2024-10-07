@@ -1,3 +1,6 @@
+from typing import Union
+
+import torch
 from matplotlib.animation import FuncAnimation, PillowWriter
 import numpy as np
 from matplotlib import pyplot as plt
@@ -5,8 +8,10 @@ from uuid import uuid4
 import os
 
 
-def tensor_movie(arr: np.ndarray, fps: int=5) -> bytes:
-    
+def tensor_movie(arr: Union[np.ndarray, torch.Tensor], fps: int=5) -> bytes:
+    if isinstance(arr, torch.Tensor):
+        arr = arr.data.cpu().numpy()
+
     if len(arr.shape) != 3:
         raise ValueError('make_movie expects a 3D array with shape (time, width, height)')
 

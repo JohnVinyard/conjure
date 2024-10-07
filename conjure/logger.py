@@ -146,7 +146,7 @@ class Logger(object):
     def log_movie(
             self,
             key: str,
-            arr: np.ndarray) -> Tuple[Any, MetaData]:
+            arr: Union[np.ndarray, torch.Tensor]) -> Tuple[Any, MetaData]:
         l = self._get_or_create_logger(key, 'image/gif', tensor_movie)
         rm = l.result_and_meta(arr)
         return rm
