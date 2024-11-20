@@ -8,7 +8,10 @@ from uuid import uuid4
 import os
 
 
-def tensor_movie(arr: Union[np.ndarray, torch.Tensor], fps: int=5) -> bytes:
+def tensor_movie(
+        arr: Union[np.ndarray, torch.Tensor],
+        fps: int=10) -> bytes:
+
     if isinstance(arr, torch.Tensor):
         arr = arr.data.cpu().numpy()
 
@@ -25,6 +28,9 @@ def tensor_movie(arr: Union[np.ndarray, torch.Tensor], fps: int=5) -> bytes:
             data.append(arr[i])
 
         fig = plt.figure()
+        plt.axis('off')
+        plt.margins(0, 0)
+
         plot = plt.imshow(data[0])
 
         def init():
@@ -44,7 +50,7 @@ def tensor_movie(arr: Union[np.ndarray, torch.Tensor], fps: int=5) -> bytes:
             blit=True,
             interval=frame_delay)
         
-        ani.save(filepath, writer=PillowWriter(fps=10))
+        ani.save(filepath, writer=PillowWriter(fps=fps))
         plt.close()
         
         with open(filepath, 'rb') as f:
@@ -55,9 +61,9 @@ def tensor_movie(arr: Union[np.ndarray, torch.Tensor], fps: int=5) -> bytes:
         os.remove(filepath)    
     
 
-if __name__ == '__main__':
-
-    data = np.random.binomial(1, 0.1, (128, 128, 128))
-    
-    with open('movie.gif', 'wb') as f:
-        f.write(make_movie(data, fps=5))
+# if __name__ == '__main__':
+#
+#     data = np.random.binomial(1, 0.1, (128, 128, 128))
+#
+#     with open('movie.gif', 'wb') as f:
+#         f.write(make_movie(data, fps=5))

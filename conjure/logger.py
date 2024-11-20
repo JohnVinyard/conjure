@@ -1,6 +1,7 @@
 from typing import Union, Callable, List, Tuple, Any, Dict
 
-from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, movie, tensor_movie
+from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, movie, tensor_movie, \
+    LiteralParamsIdentifier
 from conjure.storage import Collection, ensure_bytes
 from conjure.serialize import \
     Serializer, Deserializer, IdentityDeserializer, IdentitySerializer
@@ -82,7 +83,7 @@ def logger(
         content_type=content_type,
         storage=collection,
         func_identifier=LiteralFunctionIdentifier(name),
-        param_identifier=ParamsHash(),
+        param_identifier=LiteralParamsIdentifier(name),
         serializer=serializer,
         deserializer=deserializer)
 
