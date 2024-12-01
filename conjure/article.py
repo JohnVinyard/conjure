@@ -27,7 +27,7 @@ def build_template(page_title: str, content: str, toc: str):
                 <link rel="preconnect" href="https://fonts.googleapis.com">
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.12/build/components/bundle.js"></script>
+                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.13/build/components/bundle.js"></script>
                 <style>
                     body {{
                         font-family: "Gowun Batang", serif;
@@ -167,6 +167,7 @@ class CitationComponent:
 ```
         '''
 
+
 class ScatterPlotComponent:
     def __init__(
             self,
@@ -175,7 +176,8 @@ class ScatterPlotComponent:
             height: int,
             radius: float,
             points: np.ndarray,
-            times: Union[List[float], None] = None):
+            times: Union[List[float], None] = None,
+            colors: Union[List[str], None] = None):
 
         normalized = []
         for src in srcs:
@@ -191,6 +193,7 @@ class ScatterPlotComponent:
         self.height = height
         self.points = points
         self.times = times or [0 for _ in range(len(srcs))]
+        self.colors = colors or ['rgb(0 0 0)' for _ in range(len(srcs))]
 
     def render(self, target: RenderTarget):
         if target == 'html':
@@ -207,6 +210,7 @@ class ScatterPlotComponent:
             'startSeconds': self.times[i],
             'duration_seconds': 0,
             'url': self.srcs[i],
+            'color': self.colors[i],
         } for i, vec in enumerate(self.points)]
 
         return f'''
@@ -220,6 +224,7 @@ class ScatterPlotComponent:
 
     def markdown(self):
         raise NotImplementedError()
+
 
 class AudioComponent:
     def __init__(
@@ -301,13 +306,11 @@ def chunk_article(
         filepath: str,
         target: RenderTarget,
         **kwargs) -> Iterable[Tuple[str, int, int]]:
-
     with open(filepath, 'rb') as f:
         structure = tokenize.tokenize(f.readline)
 
         def is_markdown_section(x: str):
             return x.startswith('"""[markdown]') or x.startswith('f"""[markdown]')
-
 
         for item in structure:
             if item.type == tokenize.STRING and is_markdown_section(item.string):
@@ -363,7 +366,6 @@ def generate_table_of_contents(
         html: str,
         title: str = 'Table of Contents',
         max_depth: int = 2) -> Tuple[str, str]:
-
     # first, add anchor links to the html
     p = re.compile(pattern)
 
@@ -380,7 +382,6 @@ def generate_table_of_contents(
 
     # then scan all the anchor link and header pairs to produce a table
     # of contents
-
 
     toc_start = f'''
     <h1>{title}</h1>
