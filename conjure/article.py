@@ -1,11 +1,14 @@
 import os.path
-from typing import Any, Dict, Iterable, Literal, Tuple, Union
+from typing import Any, Dict, Iterable, Literal, Tuple, Union, List
 import tokenize
 from urllib.parse import ParseResult
+import json
 
 import markdown
 from io import BytesIO
 import re
+
+import numpy as np
 
 ChunkType = Literal['CODE', 'MARKDOWN']
 
@@ -164,10 +167,62 @@ class CitationComponent:
 ```
         '''
 
+class ScatterPlotComponent:
+    def __init__(
+            self,
+            srcs: List[Union[str, ParseResult]],
+            width: int,
+            height: int,
+            radius: float,
+            points: np.ndarray):
+
+        normalized = []
+        for src in srcs:
+            try:
+                x = src.geturl()
+            except AttributeError:
+                x = src
+            normalized.append(x)
+
+        self.radius = radius
+        self.srcs = normalized
+        self.width = width
+        self.height = height
+        self.points = points
+
+    def render(self, target: RenderTarget):
+        if target == 'html':
+            return self.html()
+        elif target == 'markdown':
+            return self.markdown()
+        else:
+            raise ValueError(f'Unknown render type "{target}"')
+
+    def html(self):
+        point_data = [{
+            'x': float(vec[0]),
+            'y': float(vec[1]),
+            'startSeconds': 0,
+            'duration_seconds': 0,
+            'url': self.srcs[i],
+        } for i, vec in enumerate(self.points)]
+
+        return f'''
+            <scatter-plot 
+                width="{self.width}" 
+                height="{self.height}" 
+                radius="{self.radius}" 
+                points='{json.dumps(point_data)}'
+            />
+            '''
+
+    def markdown(self):
+        raise NotImplementedError()
 
 class AudioComponent:
     def __init__(
-            self, src: Union[str, ParseResult],
+            self,
+            src: Union[str, ParseResult],
             height: int,
             scale: int = 1,
             controls: bool = True,
@@ -324,12 +379,15 @@ def generate_table_of_contents(
     # then scan all the anchor link and header pairs to produce a table
     # of contents
 
-    markdown_content = f'''
-# {title}
 
-<caption>Table of Contents</caption>
-
+    toc_start = f'''
+    <h1>{title}</h1>
+<details>
+    <summary>
+        <caption>Table of Contents</caption>
+    </summary>
 '''
+    markdown_content = ''
     tab = '\t'
 
     for match in p.finditer(html):
@@ -343,7 +401,9 @@ def generate_table_of_contents(
         entry = f'{tab * indent} - [{title}](#{_id})\n'
         markdown_content += entry
 
-    html_toc = markdown.markdown(markdown_content)
+    html_content = markdown.markdown(markdown_content)
+
+    html_toc = '\n'.join([toc_start, html_content, '</details>'])
     return html, html_toc
 
 
