@@ -174,7 +174,8 @@ class ScatterPlotComponent:
             width: int,
             height: int,
             radius: float,
-            points: np.ndarray):
+            points: np.ndarray,
+            times: Union[List[float], None] = None):
 
         normalized = []
         for src in srcs:
@@ -189,6 +190,7 @@ class ScatterPlotComponent:
         self.width = width
         self.height = height
         self.points = points
+        self.times = times or [0 for _ in range(len(srcs))]
 
     def render(self, target: RenderTarget):
         if target == 'html':
@@ -202,7 +204,7 @@ class ScatterPlotComponent:
         point_data = [{
             'x': float(vec[0]),
             'y': float(vec[1]),
-            'startSeconds': 0,
+            'startSeconds': self.times[i],
             'duration_seconds': 0,
             'url': self.srcs[i],
         } for i, vec in enumerate(self.points)]
@@ -212,8 +214,8 @@ class ScatterPlotComponent:
                 width="{self.width}" 
                 height="{self.height}" 
                 radius="{self.radius}" 
-                points='{json.dumps(point_data)}'
-            />
+                points='{json.dumps(point_data)}'>
+            </scatter-plot>
             '''
 
     def markdown(self):
