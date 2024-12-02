@@ -127,6 +127,25 @@ class ImageComponent:
         return f'''![{self.title}]({self.src})'''
 
 
+class TextComponent:
+    def __init__(self, markdown_text: str):
+        self.markdown_text = markdown_text
+
+    def render(self, target: RenderTarget):
+        if target == 'html':
+            return self.html()
+        elif target == 'markdown':
+            return self.markdown()
+        else:
+            raise ValueError(f'Unknown render type "{target}"')
+
+    def html(self):
+        return markdown.markdown(self.markdown_text)
+
+    def markdown(self):
+        return self.markdown_text
+
+
 class CitationComponent:
     def __init__(self, tag: str, author: str, url: str, header: str, year: str):
         super().__init__()
