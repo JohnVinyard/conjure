@@ -37,6 +37,10 @@ def create_matrix_displayer_with_cmap(cmap: str) -> Callable:
         return display_matrix(arr, cmap=cmap)
     return display_matrix_with_cmap
 
+def create_movie_logger_with_fps(fps: int = 10) -> Callable:
+    def log_movie_with_fps(arr):
+        return tensor_movie(arr, fps=fps)
+    return log_movie_with_fps
 
 def encode_audio(
         x: Union[torch.Tensor, np.ndarray],
@@ -146,7 +150,9 @@ class Logger(object):
     def log_movie(
             self,
             key: str,
-            arr: Union[np.ndarray, torch.Tensor]) -> Tuple[Any, MetaData]:
-        l = self._get_or_create_logger(key, 'image/gif', tensor_movie)
+            arr: Union[np.ndarray, torch.Tensor],
+            fps: int = 10) -> Tuple[Any, MetaData]:
+
+        l = self._get_or_create_logger(key, 'image/gif', create_movie_logger_with_fps(fps))
         rm = l.result_and_meta(arr)
         return rm
