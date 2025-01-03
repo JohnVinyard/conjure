@@ -45,7 +45,7 @@ def build_template(page_title: str, content: str, toc: str):
                         padding: 10px;
                         font-size: 0.9em;
                     }}
-                    img {{
+                    img.full-width {{
                         width: 100%;
                     }}
                     ul {{
@@ -99,9 +99,10 @@ class BytesContext:
 
 
 class ImageComponent:
-    def __init__(self, src: Union[str, ParseResult], height: int, title: str = None):
+    def __init__(self, src: Union[str, ParseResult], height: int, title: str = None, full_width: bool = True):
         super().__init__()
 
+        self.full_width = full_width
         self.title = title or 'image'
         try:
             self.src = src.geturl()
@@ -120,7 +121,7 @@ class ImageComponent:
 
     def html(self):
         return f'''
-        <img src="{self.src}" height="{self.height}"></img>
+        <img class="{'full-width' if self.full_width else ''}" src="{self.src}" height="{self.height}"></img>
         '''
 
     def markdown(self):
