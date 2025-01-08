@@ -197,7 +197,8 @@ class ScatterPlotComponent:
             radius: float,
             points: np.ndarray,
             times: Union[List[float], None] = None,
-            colors: Union[List[str], None] = None):
+            colors: Union[List[str], None] = None,
+            with_duration: bool = False):
 
         normalized = []
         for src in srcs:
@@ -207,6 +208,7 @@ class ScatterPlotComponent:
                 x = src
             normalized.append(x)
 
+        self.with_duration = with_duration
         self.radius = radius
         self.srcs = normalized
         self.width = width
@@ -229,6 +231,7 @@ class ScatterPlotComponent:
             'y': float(vec[1]),
             'startSeconds': self.times[i],
             'duration_seconds': 0,
+            'eventDuration': 1 if self.with_duration else None,
             'url': self.srcs[i],
             'color': self.colors[i],
         } for i, vec in enumerate(self.points)]
