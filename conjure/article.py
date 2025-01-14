@@ -98,6 +98,8 @@ class BytesContext:
         pass
 
 
+
+
 class ImageComponent:
     def __init__(self, src: Union[str, ParseResult], height: int, title: str = None, full_width: bool = True):
         super().__init__()
@@ -186,6 +188,37 @@ class CitationComponent:
 }}
 ```
         '''
+
+
+class AudioTimelineComponent:
+    def __init__(self, duration: float, width: int, height: int, events: List[Dict]):
+        super().__init__()
+        self.duration = duration
+        self.width = width
+        self.height = height
+        self.events = events
+
+    def render(self, target: RenderTarget):
+        if target == 'html':
+            return self.html()
+        elif target == 'markdown':
+            return self.markdown()
+        else:
+            raise ValueError(f'Unknown render type "{target}"')
+
+    def html(self):
+        return f'''
+            <audio-timeline
+                events='{json.dumps(self.events)}'
+                duration="{self.duration}"
+                width="{self.width}"
+                height="{self.height}"
+            ></audio-timeline>        
+        '''
+
+    def markdown(self):
+        raise NotImplementedError()
+
 
 
 class ScatterPlotComponent:
