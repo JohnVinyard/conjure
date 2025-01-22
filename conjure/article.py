@@ -27,14 +27,21 @@ def build_template(page_title: str, content: str, toc: str):
                 <link rel="preconnect" href="https://fonts.googleapis.com">
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.20/build/components/bundle.js"></script>
+                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.21/build/components/bundle.js"></script>
                 <style>
                     body {{
                         font-family: "Gowun Batang", serif;
                         margin: 5vh 5vw;
                         color: #333;
-                        background-color: #f0f0f0;
+                        background: #ccc;
                         font-size: 1.1em;
+                    }}
+                    .page-wrapper {{
+                        max-width: 60vw;
+                        margin: 0 auto;
+                        background: #fff;
+                        padding: 40px 60px;
+                        border-radius: 5px;
                     }}
                     .back-to-top {{
                         position: fixed;
@@ -45,8 +52,8 @@ def build_template(page_title: str, content: str, toc: str):
                         padding: 10px;
                         font-size: 0.9em;
                     }}
-                    img.full-width {{
-                        width: 100%;
+                    img {{
+                        max-width: 100%;
                     }}
                     ul {{
                         list-style-type: none;
@@ -70,15 +77,16 @@ def build_template(page_title: str, content: str, toc: str):
                 </style>
             </head>
             <body>
-                {toc}
-                {content}
-
-                <a href="#">
-                    <div class="back-to-top">
-                        Back to Top
-                    </div>
-                </a>
-
+                <div class="page-wrapper">
+                    {toc}
+                    {content}
+    
+                    <a href="#">
+                        <div class="back-to-top">
+                            Back to Top
+                        </div>
+                    </a>
+                </div>
             </body>
             </html>
     '''
