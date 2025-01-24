@@ -27,7 +27,7 @@ def build_template(page_title: str, content: str, toc: str):
                 <link rel="preconnect" href="https://fonts.googleapis.com">
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.21/build/components/bundle.js"></script>
+                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@v0.0.22/build/components/bundle.js"></script>
                 <style>
                     body {{
                         font-family: "Gowun Batang", serif;
@@ -104,8 +104,6 @@ class BytesContext:
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
-
-
 
 
 class ImageComponent:
@@ -228,7 +226,6 @@ class AudioTimelineComponent:
         raise NotImplementedError()
 
 
-
 class ScatterPlotComponent:
     def __init__(
             self,
@@ -297,7 +294,8 @@ class AudioComponent:
             height: int,
             scale: int = 1,
             controls: bool = True,
-            samples: int = 256):
+            samples: int = 256,
+            color: str = 'rgba(133, 174, 172, 0.5)'):
 
         super().__init__()
 
@@ -310,6 +308,7 @@ class AudioComponent:
         self.scale = scale
         self.controls = controls
         self.samples = samples
+        self.color = color
 
     def render(self, target: RenderTarget):
         if target == 'html':
