@@ -325,6 +325,7 @@ class AudioComponent:
             height="{self.height}"
             samples="{self.samples}"
             scale="{self.scale}"
+            color="{self.color}"
             {'controls' if self.controls else ''}
         ></audio-view>'''
 
