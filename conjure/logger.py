@@ -127,7 +127,7 @@ class Logger(object):
         l = self._get_or_create_logger(key, 'application/json', encode_json)
         rm = l.result_and_meta(data)
         return rm
-    
+
     def log_matrix_with_cmap(
             self,
             key: str,

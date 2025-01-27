@@ -106,6 +106,26 @@ class BytesContext:
         pass
 
 
+class InstrumentComponent:
+    def __init__(self, url: str):
+        super().__init__()
+        self.url = url
+
+    def render(self, target: RenderTarget):
+        if target == 'html':
+            return self.html()
+        elif target == 'markdown':
+            return self.markdown()
+        else:
+            raise ValueError(f'Unknown render type "{target}"')
+
+    def html(self):
+        return f'<instrument-element url="{self.url}" />'
+
+    def markdown(self):
+        raise NotImplementedError('')
+
+
 class ImageComponent:
     def __init__(self, src: Union[str, ParseResult], height: int, title: str = None, full_width: bool = True):
         super().__init__()

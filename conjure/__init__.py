@@ -18,4 +18,4 @@ from .movie import tensor_movie
 from .logger import logger, loggers, Logger
 from .helpers import two_dim_matrix_display_bytes
 from .article import conjure_article, ImageComponent, AudioComponent, CitationComponent, CompositeComponent, \
-    ScatterPlotComponent, TextComponent, AudioTimelineComponent
+    ScatterPlotComponent, TextComponent, AudioTimelineComponent, InstrumentComponent
