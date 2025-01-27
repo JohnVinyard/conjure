@@ -27,7 +27,7 @@ def build_template(page_title: str, content: str, toc: str):
                 <link rel="preconnect" href="https://fonts.googleapis.com">
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.27/build/components/bundle.js"></script>
+                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.28/build/components/bundle.js"></script>
                 <style>
                     body {{
                         font-family: "Gowun Batang", serif;
@@ -123,7 +123,11 @@ class InstrumentComponent:
             raise ValueError(f'Unknown render type "{target}"')
 
     def html(self):
-        return f'<instrument-element url="{self.url}"></ instrument-element>'
+        return f'''
+            <instrument-element 
+                url="{self.url}">
+            </instrument-element>
+        '''
 
     def markdown(self):
         raise NotImplementedError('')
