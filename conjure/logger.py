@@ -9,6 +9,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from io import BytesIO
 from soundfile import SoundFile
+import json
 
 
 def display_matrix(
@@ -68,6 +69,8 @@ def encode_audio(
     io.seek(0)
     return io.read()
 
+def encode_json(x: dict) -> str:
+    return json.dumps(x)
 
 def logger(
         name: str,
@@ -120,6 +123,11 @@ class Logger(object):
             self.loggers[key] = l
         return l
 
+    def log_json(self, key: str, data: dict):
+        l = self._get_or_create_logger(key, 'application/json', encode_json)
+        rm = l.result_and_meta(data)
+        return rm
+    
     def log_matrix_with_cmap(
             self,
             key: str,
