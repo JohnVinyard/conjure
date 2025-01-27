@@ -123,7 +123,7 @@ class InstrumentComponent:
             raise ValueError(f'Unknown render type "{target}"')
 
     def html(self):
-        return f'<instrument-element url="{self.url}" />'
+        return f'<instrument-element url="{self.url}"></ instrument-element>'
 
     def markdown(self):
         raise NotImplementedError('')
