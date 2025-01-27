@@ -46,7 +46,7 @@ def build_template(page_title: str, content: str, toc: str):
                     .back-to-top {{
                         position: fixed;
                         bottom: 20px;
-                        right: 20px;
+                        right: 20px;    
                         background-color: #333;
                         color: #f0f0f0;
                         padding: 10px;
@@ -107,9 +107,12 @@ class BytesContext:
 
 
 class InstrumentComponent:
-    def __init__(self, url: str):
+    def __init__(self, url: Union[str, ParseResult]):
         super().__init__()
-        self.url = url
+        try:
+            self.url = url.geturl()
+        except AttributeError:
+            self.url = url
 
     def render(self, target: RenderTarget):
         if target == 'html':
