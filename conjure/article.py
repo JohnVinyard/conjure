@@ -513,6 +513,7 @@ def conjure_article(
         target: RenderTarget,
         title: Union[str, None] = None,
         max_depth: int = 1,
+        web_components_version: str = '0.0.76',
         **kwargs: Dict[str, Any]):
     final_chunks = classify_chunks(filepath, target, **kwargs)
 
@@ -535,7 +536,12 @@ def conjure_article(
 
     filename = f'{name}.html'
     with open(filename, 'w') as f:
-        f.write(build_template(title, content, toc))
+        f.write(build_template(
+            title,
+            content,
+            toc,
+            web_components_version=web_components_version)
+        )
 
     wd = os.getcwd()
     full_path = os.path.join(wd, filename)
