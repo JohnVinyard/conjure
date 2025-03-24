@@ -15,7 +15,12 @@ ChunkType = Literal['CODE', 'MARKDOWN']
 RenderTarget = Literal['html', 'markdown']
 
 
-def build_template(page_title: str, content: str, toc: str):
+def build_template(
+        page_title: str,
+        content: str,
+        toc: str,
+        web_components_version: str = '0.0.76'):
+
     template = f'''
         <!DOCTYPE html>
             <html lang="en">
@@ -27,7 +32,9 @@ def build_template(page_title: str, content: str, toc: str):
                 <link rel="preconnect" href="https://fonts.googleapis.com">
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-                <script src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.56/build/components/bundle.js"></script>
+                <script 
+                    src="https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@{web_components_version}/build/components/bundle.js">
+                </script>
                 <style>
                     body {{
                         font-family: "Gowun Batang", serif;
