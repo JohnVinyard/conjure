@@ -151,25 +151,17 @@ class FunctionFeed(object):
 
 class Dashboard(object):
 
-    def __init__(self, conjure_funcs: List[Conjure], port: int = None):
+    def __init__(self, conjure_funcs: List[Conjure], port: int = None, web_components_version: str = '0.0.79'):
         super().__init__()
         self.conjure_funcs = {f.identifier: f for f in conjure_funcs}
         self.port = port
+        self.web_components_version = web_components_version
 
     def _uri(self, conj: Conjure, key: Union[str, bytes]) -> ParseResult:
         # TODO: host should not be hard coded here
         # return urlparse(f'http://localhost:{self.port}/functions/{conj.identifier}/{ensure_str(key)}')
         return uri(self.port, conj, key)
 
-    # def _item_html(self, conjure: Conjure) -> str:
-    #     meta = conjure.most_recent_meta()
-
-    #     if not meta.public_uri:
-    #         meta = meta.with_public_uri(self._uri(conjure, meta.key))
-
-    #     html = meta.conjure_html()
-
-    #     return html
 
     def on_get(self, req: falcon.Request, res: falcon.Response, function_id=None):
 
@@ -188,7 +180,8 @@ class Dashboard(object):
             res.body = content.format(
                 script=script,
                 imports=imports,
-                style=style)
+                style=style,
+                web_components_version=self.web_components_version)
             res.set_header('content-type', 'text/html')
             res.status = falcon.HTTP_OK
 
