@@ -154,7 +154,7 @@ class Dashboard(object):
         super().__init__()
         self.conjure_funcs = {f.identifier: f for f in conjure_funcs}
         self.port = port
-        self.web_components_version = web_components_version
+        self.web_components_version = web_components_version or '0.0.79'
 
     def _uri(self, conj: Conjure, key: Union[str, bytes]) -> ParseResult:
         # TODO: host should not be hard coded here
