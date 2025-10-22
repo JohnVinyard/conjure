@@ -1,7 +1,6 @@
 from typing import List, Union
 from urllib.parse import ParseResult, urlparse
 import falcon
-from markdown import markdown
 from conjure.decorate import Conjure, Index
 import multiprocessing
 import gunicorn.app.base
@@ -9,7 +8,7 @@ import sys
 import os
 from collections import defaultdict
 
-from conjure.storage import ensure_bytes, ensure_str
+from conjure.storage import ensure_str
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -192,7 +191,8 @@ class MutliFunctionApplication(falcon.API):
             self,
             conjure_funcs: List[Conjure],
             indexes: List[Index] = [],
-            port: int = None):
+            port: int = None,
+            web_component_version: str = None):
 
         super().__init__(middleware=[])
         self.functions = conjure_funcs
@@ -209,7 +209,10 @@ class MutliFunctionApplication(falcon.API):
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',
                        FunctionResult(conjure_funcs))
-        self.add_route('/dashboard', Dashboard(conjure_funcs, port=port))
+        self.add_route(
+            '/dashboard',
+            Dashboard(conjure_funcs, port=port, web_components_version=web_component_version))
+
         self.add_route(
             '/dashboard/functions/{function_id}', Dashboard(conjure_funcs, port=port))
 
@@ -236,9 +239,11 @@ def serve_conjure(
         port: int = 8888,
         n_workers: int = None,
         revive=True,
-        indexes: List[Index] = []):
+        indexes: List[Index] = [],
+        web_components_version: str = None):
 
-    app = MutliFunctionApplication(conjure_funcs, indexes=indexes, port=port)
+    app = MutliFunctionApplication(
+        conjure_funcs, indexes=indexes, port=port, web_component_version=web_components_version)
 
     def worker_int(worker):
         if not revive:
