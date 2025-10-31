@@ -221,6 +221,7 @@ class LmdbCollection(Collection):
         self.env = lmdb.open(
             self.path,
             max_dbs=10,
+            # https://stackoverflow.com/a/37311228/1015178
             map_size=10e11, # one terabyte
             writemap=True,
             map_async=True,
