@@ -1,6 +1,7 @@
 from typing import Union, Callable, List, Tuple, Any, Dict
 
-from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, movie, tensor_movie
+from build.lib.conjure import LiteralParamsIdentifier
+from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, movie, tensor_movie, ParamsIdentifier
 from conjure.storage import Collection, ensure_bytes
 from conjure.serialize import \
     Serializer, Deserializer, IdentityDeserializer, IdentitySerializer
@@ -78,7 +79,8 @@ def logger(
         func: Callable,
         collection: Collection,
         serializer: Union[Serializer, None] = IdentitySerializer(),
-        deserializer: Union[Deserializer, None] = IdentityDeserializer()) -> Conjure:
+        deserializer: Union[Deserializer, None] = IdentityDeserializer(),
+        store_history: bool = True) -> Conjure:
     """
     A convenience function for cases where we aren't concerned with caching the
     results of computations when repeated calls are likely, but instead for
@@ -89,7 +91,7 @@ def logger(
         content_type=content_type,
         storage=collection,
         func_identifier=LiteralFunctionIdentifier(name),
-        param_identifier=ParamsHash(),
+        param_identifier=ParamsHash() if store_history else LiteralParamsIdentifier(ensure_bytes(name)),
         serializer=serializer,
         deserializer=deserializer)
 
@@ -100,9 +102,10 @@ def loggers(
         func: Callable,
         collection: Collection,
         serializer: Union[Serializer, None] = IdentitySerializer(),
-        deserializer: Union[Deserializer, None] = IdentityDeserializer()) -> List[Conjure]:
+        deserializer: Union[Deserializer, None] = IdentityDeserializer(),
+        store_history: bool = True) -> List[Conjure]:
     return [
-        logger(name, content_type, func, collection, serializer, deserializer)
+        logger(name, content_type, func, collection, serializer, deserializer, store_history)
         for name in names
     ]
 
