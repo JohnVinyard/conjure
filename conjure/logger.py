@@ -1,7 +1,7 @@
 from typing import Union, Callable, List, Tuple, Any, Dict
 
-from build.lib.conjure import LiteralParamsIdentifier
-from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, movie, tensor_movie, ParamsIdentifier
+from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, movie, tensor_movie, ParamsIdentifier, \
+    LiteralParamsIdentifier
 from conjure.storage import Collection, ensure_bytes
 from conjure.serialize import \
     Serializer, Deserializer, IdentityDeserializer, IdentitySerializer
