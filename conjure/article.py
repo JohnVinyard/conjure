@@ -115,6 +115,34 @@ class BytesContext:
 
 
 
+class ConvInstrumentComponent:
+    def __init__(self, url: Union[str, ParseResult]):
+        super().__init__()
+        try:
+            self.url = url.geturl()
+        except AttributeError:
+            self.url = url
+
+    def render(self, target: RenderTarget):
+        if target == 'html':
+            return self.html()
+        elif target == 'markdown':
+            return self.markdown()
+        else:
+            raise ValueError(f'Unknown render type "{target}"')
+
+    def html(self):
+        return f'''
+            <conv-instrument 
+                url="{self.url}">
+            </conv-instrument>
+        '''
+
+    def markdown(self):
+        raise NotImplementedError('')
+
+
+
 class InstrumentComponent:
     def __init__(self, url: Union[str, ParseResult]):
         super().__init__()
