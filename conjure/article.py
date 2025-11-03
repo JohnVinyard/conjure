@@ -20,7 +20,6 @@ def build_template(
         content: str,
         toc: str,
         web_components_version: str = '0.0.76'):
-
     template = f'''
         <!DOCTYPE html>
             <html lang="en">
@@ -113,8 +112,6 @@ class BytesContext:
         pass
 
 
-
-
 class ConvInstrumentComponent:
     def __init__(self, url: Union[str, ParseResult]):
         super().__init__()
@@ -140,7 +137,6 @@ class ConvInstrumentComponent:
 
     def markdown(self):
         raise NotImplementedError('')
-
 
 
 class InstrumentComponent:

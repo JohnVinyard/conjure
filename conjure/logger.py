@@ -1,16 +1,16 @@
+import json
+from io import BytesIO
 from typing import Union, Callable, List, Tuple, Any, Dict
 
-from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, movie, tensor_movie, ParamsIdentifier, \
-    LiteralParamsIdentifier
-from conjure.storage import Collection, ensure_bytes
+import numpy as np
+import torch
+from matplotlib import pyplot as plt
+from soundfile import SoundFile
+
+from conjure import LiteralFunctionIdentifier, ParamsHash, Conjure, MetaData, tensor_movie, LiteralParamsIdentifier
 from conjure.serialize import \
     Serializer, Deserializer, IdentityDeserializer, IdentitySerializer
-import torch
-import numpy as np
-from matplotlib import pyplot as plt
-from io import BytesIO
-from soundfile import SoundFile
-import json
+from conjure.storage import Collection, ensure_bytes
 
 
 def display_matrix(
@@ -157,6 +157,7 @@ class Logger(object):
         l = self._get_or_create_logger(key, 'audio/wav', encode_audio)
         rm = l.result_and_meta(audio)
         return rm
+
 
     def log_movie(
             self,
