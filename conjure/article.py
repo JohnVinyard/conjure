@@ -19,7 +19,7 @@ def build_template(
         page_title: str,
         content: str,
         toc: str,
-        web_components_version: str = '0.0.76'):
+        web_components_version: str = '0.0.80'):
     template = f'''
         <!DOCTYPE html>
             <html lang="en">
@@ -196,6 +196,45 @@ class ImageComponent:
         return f'''![{self.title}]({self.src})'''
 
 
+class VideoComponent:
+    def __init__(self, src: Union[str, ParseResult], width: int, height: int, start_time: float = 0):
+        super().__init__()
+        try:
+            self.src = src.geturl()
+        except AttributeError:
+            self.src = src
+
+        self.width = width
+        self.height = height
+        self.start_time = start_time
+
+    def render(self, target: RenderTarget):
+        if target == 'html':
+            return self.html()
+        elif target == 'markdown':
+            return self.markdown()
+        else:
+            raise ValueError(f'Unknown render type "{target}"')
+
+    @property
+    def full_url(self):
+        return f'{self.src}#t={self.start_time}'
+
+    def html(self):
+        return f'''
+        <video
+          preload="metadata"
+          src="{self.full_url}"
+          height="{self.height}"
+          width="{self.width}"
+          controls
+        ></video>
+        '''
+
+    def markdown(self):
+        raise NotImplementedError('Markdown not supported')
+
+
 class TextComponent:
     def __init__(self, markdown_text: str):
         self.markdown_text = markdown_text
@@ -355,7 +394,7 @@ class AudioComponent:
             scale: int = 1,
             controls: bool = True,
             samples: int = 256,
-            color: str = 'rgba(133, 174, 172, 0.5)'):
+            color: str = '#ededed'):
 
         super().__init__()
 
