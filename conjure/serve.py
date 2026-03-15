@@ -124,7 +124,7 @@ class FunctionResult(object):
             result = func.get_raw(key)
             res.content_length = result.content_length
             res.content_type = result.content_type
-            res.body = result.raw
+            res.text = result.raw
             res.status = falcon.HTTP_OK
         except KeyError:
             res.status = falcon.HTTP_NOT_FOUND
@@ -176,7 +176,7 @@ class Dashboard(object):
         with open(os.path.join(MODULE_DIR, 'dashboard.html'), 'r') as f:
             content = f.read()
             res.content_length = len(content)
-            res.body = content.format(
+            res.text = content.format(
                 script=script,
                 imports=imports,
                 style=style,
