@@ -10,3 +10,4 @@ markdown
 inotify
 matplotlib
 soundfile
+traitlets

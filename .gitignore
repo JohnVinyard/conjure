@@ -134,3 +134,5 @@ http_test/*
 *.mdb
 
 .idea/
+
+tests/tmp/*

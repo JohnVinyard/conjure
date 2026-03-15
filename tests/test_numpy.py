@@ -27,7 +27,7 @@ class AllOnesDeserializer(NumpyDeserializer):
 class TestNumpyStorage(TestCase):
 
     def setUp(self) -> None:
-        self.path = f'/tmp/{v4().hex}'
+        self.path = f'tests/tmp/{v4().hex}'
         self.db = LmdbCollection(self.path)
 
     def tearDown(self) -> None:

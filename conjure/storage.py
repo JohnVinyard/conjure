@@ -222,11 +222,12 @@ class LmdbCollection(Collection):
             self.path,
             max_dbs=10,
             # https://stackoverflow.com/a/37311228/1015178
-            map_size=10e11, # one terabyte
+            map_size=int(10e11), # one terabyte
             writemap=True,
             map_async=True,
             metasync=True,
-            lock=False)
+            lock=False
+        )
         self._default_database_name = ensure_bytes(default_database_name)
         self._data = self.env.open_db(self._default_database_name)
         self._offsets = self.env.open_db(b'offsets')

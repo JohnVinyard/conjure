@@ -21,7 +21,7 @@ def tensor_movie(
     n_frames, width, height = arr.shape
     
     try:
-        filepath = f'/tmp/{uuid4().hex}.gif'
+        filepath = f'tests/tmp/{uuid4().hex}.gif'
 
         data = []
         for i in range(n_frames):

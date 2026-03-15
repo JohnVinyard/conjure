@@ -18,7 +18,7 @@ class TestExploratory(TestCase):
         cls.path = v4().hex
         cls.bucket_name = 'conjure-test'
         cls.db = LocalCollectionWithBackup(
-            f'/tmp/{cls.path}',
+            f'tests/tmp/{cls.path}',
             remote_bucket=cls.bucket_name,
             is_public=True,
             cors_enabled=True)
@@ -86,9 +86,9 @@ class TestStorage(TestCase):
         self.content_type = 'application/text-plain'
         self.path = v4().hex
         self.backup_path = v4().hex
-        self.backup = LmdbCollection(f'/tmp/{self.backup_path}')
+        self.backup = LmdbCollection(f'tests/tmp/{self.backup_path}')
         self.db = LocalCollectionWithBackup(
-            f'/tmp/{self.path}',
+            f'tests/tmp/{self.path}',
             remote_bucket=None,
             is_public=False,
             local_backup=self.backup)

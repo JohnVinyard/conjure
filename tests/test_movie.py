@@ -1,5 +1,5 @@
 import numpy as np
-from unittest2 import TestCase
+from unittest import TestCase
 from conjure import tensor_movie
 
 
