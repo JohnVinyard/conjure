@@ -7,7 +7,7 @@ from .serialize import \
 from .identifier import \
     FunctionContentIdentifier, FunctionNameIdentifier, ParamsHash, \
     ParamsIdentifier, ParamsJSON, LiteralFunctionIdentifier, LiteralParamsIdentifier
-from .storage import LocalCollectionWithBackup, LmdbCollection, S3Collection
+from .storage import LocalCollectionWithBackup, LmdbCollection, S3Collection, SqliteCollection
 from .decorate import \
     Conjure, conjure, json_conjure, numpy_conjure, audio_conjure, time_series_conjure, \
     text_conjure, MetaData, WriteNotification, conjure_index, pickle_conjure, bytes_conjure

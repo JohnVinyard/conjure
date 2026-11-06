@@ -7,7 +7,7 @@ from conjure.decorate import Conjure, numpy_conjure
 from conjure.identifier import FunctionContentIdentifier, \
     LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import NumpyDeserializer, NumpySerializer
-from conjure.storage import LmdbCollection
+from conjure.storage import LmdbCollection, SqliteCollection
 from typing import BinaryIO, Callable
 
 
@@ -25,10 +25,11 @@ class AllOnesDeserializer(NumpyDeserializer):
 
 
 class TestNumpyStorage(TestCase):
+    collection_class = LmdbCollection
 
     def setUp(self) -> None:
         self.path = f'tests/tmp/{v4().hex}'
-        self.db = LmdbCollection(self.path)
+        self.db = self.collection_class(self.path)
 
     def tearDown(self) -> None:
         self.db.destroy()
@@ -204,3 +205,7 @@ class TestNumpyStorage(TestCase):
 
         feed_items = list(loss.feed())
         self.assertEqual(3, len(feed_items))
+
+
+class SqliteTestNumpyStorage(TestNumpyStorage):
+    collection_class = SqliteCollection

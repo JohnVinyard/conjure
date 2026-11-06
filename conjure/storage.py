@@ -1,5 +1,10 @@
+from contextlib import contextmanager
+from enum import Enum
+import os
 from os import PathLike
-from typing import Callable, Iterable, Union
+import sqlite3
+import threading
+from typing import Callable, Iterable, Iterator, Union
 from urllib.parse import ParseResult, urlparse
 import lmdb
 import boto3
@@ -21,6 +26,15 @@ def ensure_bytes(value: Union[str, bytes, memoryview]) -> bytes:
 
 def ensure_str(value: Union[str, bytes]) -> str:
     return value if isinstance(value, str) else value.decode()
+
+
+def _content_type_str(content_type) -> Union[str, None]:
+    # content types may be plain strings, or SupportedContentType members
+    if content_type is None or isinstance(content_type, str):
+        return content_type
+    if isinstance(content_type, Enum):
+        return content_type.value
+    return str(content_type)
 
 
 class Collection(object):
@@ -355,6 +369,308 @@ class LmdbCollection(Collection):
             return bytes(value)
 
 
+class SqliteCollection(Collection):
+    """
+    A local collection backed by a single SQLite file, opened in WAL mode.
+
+    Unlike LMDB, this is safe to share between multiple processes (e.g.
+    gunicorn workers) without any special care:  each process (and thread)
+    lazily opens its own connection, so a collection created before a fork
+    keeps working in the child processes.  Readers never block, and writers
+    are serialized by SQLite, waiting up to `timeout` seconds for the lock.
+
+    Several logical collections can share one file (see `index_storage`);
+    each is identified by its `namespace`.
+
+    Note that WAL mode does not work on network filesystems.
+    """
+
+    SCHEMA_VERSION = 1
+
+    # number of rows fetched per query when iterating, so that no read
+    # transaction is held open while the caller consumes a generator
+    _PAGE_SIZE = 256
+
+    def __init__(
+            self,
+            path: PathLike,
+            extract_base_key: Callable[[bytes], bytes] = None,
+            default_database_name: str = 'data',
+            build_feed: bool = True,
+            port=None,
+            timeout: float = 30):
+
+        super().__init__()
+
+        # KLUDGE: Delimiter is configurable elsewhere, so this might cause problems
+        self.extract_base_key = extract_base_key or (
+            lambda x: ensure_bytes(ensure_str(x).split('_')[0]))
+        self.path = os.fspath(path)
+        self.namespace = ensure_str(default_database_name)
+        self.build_feed = build_feed
+        self.timeout = timeout
+        self._port = port
+
+        self._thread_local = threading.local()
+        self._connections_lock = threading.Lock()
+        self._connections = []
+
+        directory = os.path.dirname(self.path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+
+        # create the schema eagerly, so configuration problems surface early
+        self._connection
+
+    @property
+    def _connection(self) -> sqlite3.Connection:
+        # connections must never cross a fork, and sqlite3 connections should
+        # not be shared between threads, so there's one per (process, thread)
+        pid = os.getpid()
+        conn = getattr(self._thread_local, 'conn', None)
+        if conn is not None and self._thread_local.pid == pid:
+            return conn
+
+        conn = self._connect()
+        self._thread_local.conn = conn
+        self._thread_local.pid = pid
+        with self._connections_lock:
+            self._connections.append((pid, conn))
+        return conn
+
+    def _connect(self) -> sqlite3.Connection:
+        # isolation_level=None means that transactions are managed explicitly
+        conn = sqlite3.connect(
+            self.path,
+            timeout=self.timeout,
+            isolation_level=None,
+            check_same_thread=False)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        self._create_schema(conn)
+        return conn
+
+    def _create_schema(self, conn: sqlite3.Connection):
+        with self._transaction(conn) as c:
+            version = c.execute('PRAGMA user_version').fetchone()[0]
+            if version == self.SCHEMA_VERSION:
+                return
+            if version > self.SCHEMA_VERSION:
+                raise RuntimeError(
+                    f'{self.path} has schema version {version}, but this '
+                    f'version of conjure only understands up to {self.SCHEMA_VERSION}')
+
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS data (
+                    namespace TEXT NOT NULL,
+                    key BLOB NOT NULL,
+                    value BLOB NOT NULL,
+                    content_type TEXT,
+                    PRIMARY KEY (namespace, key)
+                )
+            ''')
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS feed (
+                    namespace TEXT NOT NULL,
+                    feed_key BLOB NOT NULL,
+                    key BLOB NOT NULL,
+                    PRIMARY KEY (namespace, feed_key)
+                )
+            ''')
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS offsets (
+                    namespace TEXT PRIMARY KEY,
+                    offset BLOB NOT NULL
+                )
+            ''')
+            c.execute(f'PRAGMA user_version = {self.SCHEMA_VERSION}')
+
+    @staticmethod
+    @contextmanager
+    def _transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
+        # IMMEDIATE takes the write lock up front, so the busy timeout applies,
+        # rather than failing when a read lock is later upgraded to a write lock
+        conn.execute('BEGIN IMMEDIATE')
+        try:
+            yield conn
+        except BaseException:
+            conn.execute('ROLLBACK')
+            raise
+        else:
+            conn.execute('COMMIT')
+
+    @contextmanager
+    def transaction(self) -> Iterator[sqlite3.Connection]:
+        """
+        A write transaction on this process's connection.  Everything
+        executed within it is committed atomically, or not at all.
+        """
+        with self._transaction(self._connection) as conn:
+            yield conn
+
+    def public_uri(self, key: Union[bytes, str]):
+        # TODO: This should be a subclass defined in serve.py
+        if self._port is None:
+            raise NotImplementedError()
+        base = ensure_str(self.extract_base_key(key))
+        k = ensure_str(key)
+
+        uri = f'http://localhost:{self._port}/functions/{base}/{k}'
+        parsed = urlparse(uri)
+        return parsed
+
+    @property
+    def offset(self):
+        row = self._connection.execute(
+            'SELECT offset FROM offsets WHERE namespace = ?',
+            (self.namespace,)).fetchone()
+        return None if row is None else bytes(row[0])
+
+    def set_offset(self, offset, txn: sqlite3.Connection = None):
+        conn = txn or self._connection
+        conn.execute(
+            'INSERT OR REPLACE INTO offsets (namespace, offset) VALUES (?, ?)',
+            (self.namespace, ensure_bytes(offset)))
+
+    def index_storage(self, name):
+        return SqliteCollection(
+            self.path,
+            self.extract_base_key,
+            default_database_name=name,
+            build_feed=False,
+            timeout=self.timeout)
+
+    def close(self):
+        """
+        Close every connection this instance opened in the current process
+        """
+        pid = os.getpid()
+        with self._connections_lock:
+            remaining = []
+            for conn_pid, conn in self._connections:
+                if conn_pid == pid:
+                    conn.close()
+                else:
+                    remaining.append((conn_pid, conn))
+            self._connections = remaining
+        self._thread_local = threading.local()
+
+    def destroy(self):
+        self.close()
+        for suffix in ('', '-wal', '-shm'):
+            try:
+                os.remove(f'{self.path}{suffix}')
+            except FileNotFoundError:
+                pass
+
+    def _iter_range(
+            self,
+            table: str,
+            key_column: str,
+            columns: str,
+            start_key: bytes,
+            prefix: Union[bytes, None]) -> Iterable[tuple]:
+        """
+        Yield rows with key >= start_key, in key order, stopping at the first
+        key that doesn't begin with prefix, if one is provided.
+        """
+        conn = self._connection
+        query = f'''
+            SELECT {key_column}, {columns} FROM {table}
+            WHERE namespace = ? AND {key_column} {{op}} ?
+            ORDER BY {key_column}
+            LIMIT {self._PAGE_SIZE}
+        '''
+
+        op = '>='
+        last = start_key
+        while True:
+            rows = conn.execute(
+                query.format(op=op), (self.namespace, last)).fetchall()
+            for row in rows:
+                key = bytes(row[0])
+                if prefix is not None and not key.startswith(prefix):
+                    return
+                yield (key, *row[1:])
+
+            if len(rows) < self._PAGE_SIZE:
+                return
+
+            op = '>'
+            last = bytes(rows[-1][0])
+
+    def feed(self, offset: Union[bytes, str] = None):
+        if not self.build_feed:
+            raise NotImplementedError('This storage instance has no feed')
+
+        final_offset = ensure_bytes(offset or '')
+        prefix = self.extract_base_key(final_offset)
+
+        rows = self._iter_range('feed', 'feed_key', 'key', final_offset, prefix)
+        for feed_key, key in rows:
+            yield {'timestamp': feed_key, 'key': bytes(key)}
+
+    def content_length(self, key) -> int:
+        row = self._connection.execute(
+            'SELECT length(value) FROM data WHERE namespace = ? AND key = ?',
+            (self.namespace, ensure_bytes(key))).fetchone()
+        if row is None:
+            raise KeyError(key)
+        return row[0]
+
+    def __contains__(self, key: Union[str, bytes]):
+        row = self._connection.execute(
+            'SELECT 1 FROM data WHERE namespace = ? AND key = ?',
+            (self.namespace, ensure_bytes(key))).fetchone()
+        return row is not None
+
+    def iter_prefix(
+            self,
+            start_key: Union[str, bytes],
+            prefix: Union[str, bytes, None] = None) -> Iterable[bytes]:
+
+        prefix = None if prefix is None else ensure_bytes(prefix)
+        rows = self._iter_range(
+            'data', 'key', '1', ensure_bytes(start_key), prefix)
+        for key, _ in rows:
+            yield key
+
+    def __delitem__(self, key: Union[str, bytes]):
+        with self.transaction() as txn:
+            txn.execute(
+                'DELETE FROM data WHERE namespace = ? AND key = ?',
+                (self.namespace, ensure_bytes(key)))
+
+    def put(self, key: Union[str, bytes], value: Union[str, bytes], content_type: str):
+        key = ensure_bytes(key)
+
+        with self.transaction() as txn:
+            txn.execute(
+                '''
+                INSERT OR REPLACE INTO data (namespace, key, value, content_type)
+                VALUES (?, ?, ?, ?)
+                ''',
+                (self.namespace, key, ensure_bytes(value), _content_type_str(content_type)))
+
+            if self.build_feed:
+                timestamp = timestamp_id()
+                base_key = self.extract_base_key(key)
+                feed_key = ensure_bytes(
+                    f'{base_key.decode()}_{timestamp.decode()}')
+                txn.execute(
+                    'INSERT INTO feed (namespace, feed_key, key) VALUES (?, ?, ?)',
+                    (self.namespace, feed_key, key))
+                self.set_offset(feed_key, txn=txn)
+
+    def __getitem__(self, key) -> bytes:
+        row = self._connection.execute(
+            'SELECT value FROM data WHERE namespace = ? AND key = ?',
+            (self.namespace, ensure_bytes(key))).fetchone()
+        if row is None:
+            raise KeyError(key)
+        return bytes(row[0])
+
+
 class LocalCollectionWithBackup(Collection):
     def __init__(
             self,
@@ -362,17 +678,18 @@ class LocalCollectionWithBackup(Collection):
             remote_bucket,
             is_public=False,
             local_backup=False,
-            cors_enabled=False):
+            cors_enabled=False,
+            local_collection_class=LmdbCollection):
 
         super().__init__()
         self.local_backup = local_backup
 
-        self._local = LmdbCollection(local_path)
+        self._local = local_collection_class(local_path)
 
         if isinstance(self.local_backup, Collection):
             self._remote = local_backup
         elif self.local_backup:
-            self._remote = LmdbCollection(f'{local_path}_backup')
+            self._remote = local_collection_class(f'{local_path}_backup')
         else:
             self._remote = S3Collection(
                 remote_bucket, is_public=is_public, cors_enabled=cors_enabled)

@@ -6,13 +6,14 @@ from io import BytesIO
 from uuid import uuid4 as v4
 from conjure.contenttype import SupportedContentType
 from conjure.decorate import bytes_conjure
-from conjure.storage import LmdbCollection
+from conjure.storage import LmdbCollection, SqliteCollection
 
 class BytesConjureTests(TestCase):
-    
+    collection_class = LmdbCollection
+
     def setUp(self) -> None:
         self.path = f'tests/tmp/{v4().hex}'
-        self.db = LmdbCollection(self.path)
+        self.db = self.collection_class(self.path)
 
     def tearDown(self) -> None:
         self.db.destroy()
@@ -68,3 +69,7 @@ class BytesConjureTests(TestCase):
         image_bytes = image(data)
         self.assertIsInstance(image_bytes, bytes)
         self.assertEqual(counter['c'], 1)
+
+
+class SqliteBytesConjureTests(BytesConjureTests):
+    collection_class = SqliteCollection

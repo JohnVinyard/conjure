@@ -8,12 +8,12 @@ from random import random
 
 from traitlets import Callable
 
-from build.lib.conjure import IdentitySerializer, IdentityDeserializer, FunctionNameIdentifier
+from conjure import IdentitySerializer, IdentityDeserializer, FunctionNameIdentifier
 from conjure.decorate import Conjure, Index, WriteNotification, conjure_index, json_conjure, text_conjure, bytes_conjure
 from conjure.identifier import FunctionContentIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import JSONDeserializer, JSONSerializer
 from conjure.serve import serve_conjure
-from conjure.storage import LmdbCollection, ensure_str
+from conjure.storage import LmdbCollection, SqliteCollection, ensure_str
 from conjure.contenttype import SupportedContentType
 from uuid import uuid4 as v4
 import numpy as np
@@ -34,11 +34,13 @@ def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
 
 
 class DecorateTests(TestCase):
+    collection_class = LmdbCollection
+    serve_port = 9999
 
     def setUp(self) -> None:
         self.process: Union[Process, None] = None
         self.path = f'tests/tmp/{v4().hex}'
-        self.db = LmdbCollection(self.path)
+        self.db = self.collection_class(self.path)
 
     def tearDown(self) -> None:
         self.db.destroy()
@@ -183,11 +185,11 @@ class DecorateTests(TestCase):
         make_bigger({'z': 11, 'b': 3})
 
         self.process = serve_conjure(
-            [make_bigger], port=9999, n_workers=1, revive=False)
+            [make_bigger], port=self.serve_port, n_workers=1, revive=False)
 
         def get_keys_over_http():
             resp = requests.get(
-                f'http://localhost:9999/functions/{make_bigger.identifier}', verify=False)
+                f'http://localhost:{self.serve_port}/functions/{make_bigger.identifier}', verify=False)
             keys = resp.json()['keys']
             self.assertEqual(2, len(keys))
 
@@ -195,7 +197,7 @@ class DecorateTests(TestCase):
 
         meta = make_bigger.meta({'a': 10, 'b': 3})
         resp = requests.get(
-            f'http://localhost:9999/functions/{make_bigger.identifier}/{meta.key.decode()}', verify=False)
+            f'http://localhost:{self.serve_port}/functions/{make_bigger.identifier}/{meta.key.decode()}', verify=False)
         self.assertEqual(200, resp.status_code)
         self.assertEqual('application/json', resp.headers['content-type'])
         self.assertEqual(json.dumps(result), resp.content.decode())
@@ -485,3 +487,8 @@ class DecorateTests(TestCase):
         best = results[0]
 
         self.assertEqual(content['c'], best['content'])
+
+
+class SqliteDecorateTests(DecorateTests):
+    collection_class = SqliteCollection
+    serve_port = 9998
