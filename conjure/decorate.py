@@ -1,6 +1,5 @@
 import datetime
 import json
-from types import FunctionType
 from typing import Any, Callable, Iterable, Tuple, Union
 from urllib.parse import ParseResult
 
@@ -14,9 +13,11 @@ from conjure.serialize import \
     JSONSerializer, NumpyDeserializer, NumpySerializer, Serializer, \
     PickleSerializer, PickleDeserializer
 from conjure.storage import Collection, LocalCollectionWithBackup, ensure_bytes, ensure_str
+from conjure.indexes import ConjureIndex, Indices
+from conjure.index_store import IndexStore, SqliteIndexStore
+from conjure.storage import SqliteCollection
 import inspect
 from urllib.parse import urlunparse
-from collections import Counter
 
 
 class MetaData(object):
@@ -121,7 +122,9 @@ class Conjure(object):
         deserializer: Deserializer,
         key_delimiter='_',
         prefer_cache=True,
-        read_from_cache_hook=lambda x: None
+        read_from_cache_hook=lambda x: None,
+        indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None
     ):
 
         super().__init__()
@@ -142,6 +145,25 @@ class Conjure(object):
 
         if '_' in ensure_str(self.identifier):
             raise ValueError('"_" is not currently supported in literal function identifiers.  TODO: Make this configurable globally')
+
+        self.indices = Indices(indices or [])
+        self.index_store = index_store
+        if self.indices:
+            if self.index_store is None:
+                self.index_store = self._default_index_store(storage)
+            for index in self.indices:
+                index.attach(self.index_store, self.identifier)
+
+    @staticmethod
+    def _default_index_store(storage: Collection) -> IndexStore:
+        if isinstance(storage, SqliteCollection):
+            # keep indices in the same file as results
+            return SqliteIndexStore(storage.path, timeout=storage.timeout)
+
+        raise TypeError(
+            f'Indices need an index store, and there is no default for '
+            f'{type(storage).__name__}.  Pass e.g. '
+            "index_store=SqliteIndexStore('indices.sqlite')")
 
     @property
     def offset(self):
@@ -234,6 +256,12 @@ class Conjure(object):
     
     def delete(self, *args, **kwargs):
         key = self.key(*args, **kwargs)
+
+        # remove index entries first:  if the second step fails, the result
+        # is left unindexed, and will be indexed again on its next cache hit,
+        # rather than leaving index entries that point to nothing
+        if self.indices:
+            self.index_store.delete(key, list(self.indices))
         del self.storage[key]
 
     def get(self, key):
@@ -269,7 +297,17 @@ class Conjure(object):
 
         # TODO: Feed keys should be computed here, so they
         # can be passed along with the write notification
+        # extract index values first, so that a failing extractor stores
+        # nothing, and the problem surfaces immediately
+        entries = [
+            (index, index.values(obj, *args, **kwargs))
+            for index in self.indices]
+
         self.storage.put(key, raw, self.content_type)
+
+        # if this fails, the result is indexed on its next cache hit
+        if entries:
+            self.index_store.write(key, entries)
 
         # notify listeners
         for listener in self.listeners:
@@ -291,149 +329,32 @@ class Conjure(object):
         try:
             raw = self.storage[key]
             obj = self.deserializer.from_bytes(raw)
-
             self.read_from_cache_hook(obj)
-            
-            return obj
         except KeyError:
             return self._compute_and_store(key, *args, **kwargs)
 
+        # kept outside of the try block above, so that a KeyError raised by
+        # an extractor isn't mistaken for a cache miss
+        self._index_if_missing(key, obj, *args, **kwargs)
 
-class Index(object):
-    def __init__(
-            self,
-            name: str,
-            collection: Collection,
-            conjure: Conjure,
-            func: FunctionType,
-            serializer: Serializer = JSONSerializer(),
-            deserializer: Deserializer = JSONDeserializer(),
-            register_listener=True):
+        return obj
 
-        super().__init__()
-        self.func = func
-        self.name = name
-        self.serializer = serializer
-        self.deserializer = deserializer
-        self.conjure = conjure
-        self.collection = collection
-
-        if register_listener:
-            self.conjure.register_listener(
-                lambda x: self.extract_and_store(x.key, x.value, *x.args, **x.kwargs))
-
-        self.keys_processed_in_current_session = 0
-
-    @property
-    def description(self):
-        return self.func.__doc__
-
-    @property
-    def description_html(self):
-        formatted = '\n'.join(
-            map(lambda x: x.strip(), (self.description or '').split('\n')))
-        return markdown(formatted)
-
-    @property
-    def conjure_identifier(self):
-        return self.conjure.identifier
-
-    @property
-    def offset(self):
-        if self.collection.offset is None:
-            return None
-        return ensure_bytes(self.collection.offset)
-
-    def index(self):
-
-        for item in self.conjure.feed(offset=self.offset):
-            if self.offset == item['timestamp']:
-                continue
-
-            key = item['key']
-            obj = self.conjure.get(key)
-            # TODO: What if I need to partially/fuly reconstruct the
-            # original arguments?
-            self.extract_and_store(key, obj, feed_offset=item['timestamp'])
-
-    def extract_key(self, data):
-        return data['key']
-
-    @property
-    def content_type(self):
-        return 'application/json'
-
-    def extract_and_store(self, key, result, feed_offset=None, *args, **kwargs):
-        document_key = key
-
-        for i, pair in enumerate(self.extract(key, result, *args, **kwargs)):
-            try:
-                key, value = pair
-
-                k = ensure_str(key)
-
-                # NOTE: The assumption here is that index keys are extracted
-                # from the document in an ordered, deterministic way
-                full_key = f'{k}_{ensure_str(document_key)}_{hex(i)}'
-
-                self.collection.put(
-                    ensure_bytes(full_key), self.serializer.to_bytes(value), self.content_type)
-            except Exception as e:
-                print(f'Error processing document {document_key}, {key}')
-                pass
-
-        if feed_offset:
-            self.collection.set_offset(ensure_bytes(feed_offset))
-            self.keys_processed_in_current_session += 1
-
-    def extract(self, key, result, *args, **kwargs) -> Iterable[Tuple[Union[str, bytes], Any]]:
-        results = self.func(key, result, *args, **kwargs)
-        for key, value in results:
-            if not self.extract_key(value):
-                raise ValueError('Could not extract key')
-            yield key, value
-
-    def search(self, query: Union[str, bytes]):
-        values = []
-
-        for key in self.collection.iter_prefix(query, query):
-            raw_value = self.collection[key]
-            value = self.deserializer.from_bytes(raw_value)
-            values.append(value)
-
-        return self.compact(values)
-
-    def compact(self, results):
+    def _index_if_missing(self, key, obj, *args, **kwargs):
         """
-        Since the key may appear multiple times, rank by "relevance"
+        Add index entries for a cached result that some index hasn't
+        processed, e.g. because the result was cached before the index
+        was defined.  Each index processes a given key only once.
         """
+        if not self.indices:
+            return
 
-        indexed = {r['key']: r for r in results}
+        missing = self.index_store.unprocessed(key, list(self.indices))
+        if not missing:
+            return
 
-        counter = Counter()
-        for result in results:
-            key = result['key']
-            counter[key] += 1
-
-        srt = sorted(counter.items(), key=lambda x: x[1], reverse=True)
-        return [indexed[k[0]] for k in srt]
-
-
-def conjure_index(conjure: Conjure, collection: Collection = None, name: str = None):
-
-    def deco(f: Callable):
-
-        n = name or f.__name__
-
-        return Index(
-            name=n,
-            conjure=conjure,
-            collection=collection,
-            func=f,
-            serializer=JSONSerializer(),
-            deserializer=JSONDeserializer())
-
-    return deco
+        entries = [
+            (index, index.values(obj, *args, **kwargs)) for index in missing]
+        self.index_store.write(key, entries)
 
 
 def conjure(
@@ -445,7 +366,9 @@ def conjure(
         deserializer: Deserializer,
         key_delimiter='_',
         prefer_cache=True,
-        read_from_cache_hook=lambda x: None):
+        read_from_cache_hook=lambda x: None,
+        indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
 
     def deco(f: Callable):
         return Conjure(
@@ -458,12 +381,19 @@ def conjure(
             deserializer=deserializer,
             key_delimiter=key_delimiter,
             prefer_cache=prefer_cache,
-            read_from_cache_hook=read_from_cache_hook
+            read_from_cache_hook=read_from_cache_hook,
+            indices=indices,
+            index_store=index_store
         )
     return deco
 
 
-def bytes_conjure(storage: Collection, content_type: Union[SupportedContentType, str], read_hook=None):
+def bytes_conjure(
+        storage: Collection,
+        content_type: Union[SupportedContentType, str],
+        read_hook=None,
+        indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
     
     try:
         content_type = content_type.value
@@ -477,10 +407,13 @@ def bytes_conjure(storage: Collection, content_type: Union[SupportedContentType,
         param_identifier=ParamsHash(),
         serializer=IdentitySerializer(),
         deserializer=IdentityDeserializer(),
-        read_from_cache_hook=read_hook
+        read_from_cache_hook=read_hook,
+        indices=indices,
+        index_store=index_store
     )
 
-def text_conjure(storage: Collection):
+def text_conjure(storage: Collection, indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
     return conjure(
         content_type=SupportedContentType.Text.value,
         storage=storage,
@@ -488,10 +421,13 @@ def text_conjure(storage: Collection):
         param_identifier=ParamsHash(),
         serializer=IdentitySerializer(),
         deserializer=IdentityDeserializer(),
+        indices=indices,
+        index_store=index_store
     )
 
 
-def pickle_conjure(storage: Collection, read_hook = None):
+def pickle_conjure(storage: Collection, read_hook = None, indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
     return conjure(
         content_type='application/octet-stream',
         storage=storage,
@@ -499,9 +435,12 @@ def pickle_conjure(storage: Collection, read_hook = None):
         param_identifier=ParamsHash(),
         serializer=PickleSerializer(),
         deserializer=PickleDeserializer(),
-        read_from_cache_hook=read_hook)
+        read_from_cache_hook=read_hook,
+        indices=indices,
+        index_store=index_store)
 
-def json_conjure(storage: Collection, tag_deserialized=False):
+def json_conjure(storage: Collection, tag_deserialized=False, indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
     return conjure(
         content_type='application/json',
         storage=storage,
@@ -509,6 +448,8 @@ def json_conjure(storage: Collection, tag_deserialized=False):
         param_identifier=ParamsHash(),
         serializer=JSONSerializer(),
         deserializer=JSONDeserializer(tag_deserialized=tag_deserialized),
+        indices=indices,
+        index_store=index_store
     )
 
 
@@ -517,7 +458,9 @@ def numpy_conjure(
         content_type=SupportedContentType.Tensor.value,
         read_hook=lambda x: None,
         identifier: bytes = None,
-        param_key: bytes = None):
+        param_key: bytes = None,
+        indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
 
     return conjure(
         content_type=content_type,
@@ -530,14 +473,18 @@ def numpy_conjure(
             else LiteralParamsIdentifier(param_key),
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),
-        read_from_cache_hook=read_hook
+        read_from_cache_hook=read_hook,
+        indices=indices,
+        index_store=index_store
     )
 
 
 def audio_conjure(
         storage: Collection, 
         identifier: bytes = None, 
-        param_key: bytes = None):
+        param_key: bytes = None,
+        indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
 
     return conjure(
         content_type=SupportedContentType.Audio.value,
@@ -550,10 +497,13 @@ def audio_conjure(
             else LiteralParamsIdentifier(param_key),
         serializer=IdentitySerializer(),
         deserializer=IdentityDeserializer(),
+        indices=indices,
+        index_store=index_store
     )
 
 
-def time_series_conjure(storage: Collection, name: bytes):
+def time_series_conjure(storage: Collection, name: bytes, indices: Iterable[ConjureIndex] = None,
+        index_store: IndexStore = None):
     return conjure(
         content_type=SupportedContentType.TimeSeries.value,
         storage=storage,
@@ -562,4 +512,6 @@ def time_series_conjure(storage: Collection, name: bytes):
         serializer=NumpySerializer(),
         deserializer=NumpyDeserializer(),
         prefer_cache=False,
+        indices=indices,
+        index_store=index_store
     )

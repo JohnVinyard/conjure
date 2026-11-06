@@ -8,9 +8,13 @@ from .identifier import \
     FunctionContentIdentifier, FunctionNameIdentifier, ParamsHash, \
     ParamsIdentifier, ParamsJSON, LiteralFunctionIdentifier, LiteralParamsIdentifier
 from .storage import LocalCollectionWithBackup, LmdbCollection, S3Collection, SqliteCollection
+from .indexes import \
+    TextIndex, VectorIndex, ScalarIndex, TagIndex, IndexHit, ConjureIndex, Indices, \
+    IndexFilter, TextMatch, Range, HasTags
+from .index_store import IndexStore, SqliteIndexStore
 from .decorate import \
     Conjure, conjure, json_conjure, numpy_conjure, audio_conjure, time_series_conjure, \
-    text_conjure, MetaData, WriteNotification, conjure_index, pickle_conjure, bytes_conjure
+    text_conjure, MetaData, WriteNotification, pickle_conjure, bytes_conjure
 from .serve import serve_conjure
 from .timestamp import timestamp_id
 from .contenttype import SupportedContentType

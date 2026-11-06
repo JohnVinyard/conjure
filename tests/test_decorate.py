@@ -9,7 +9,9 @@ from random import random
 from traitlets import Callable
 
 from conjure import IdentitySerializer, IdentityDeserializer, FunctionNameIdentifier
-from conjure.decorate import Conjure, Index, WriteNotification, conjure_index, json_conjure, text_conjure, bytes_conjure
+from conjure.decorate import Conjure, WriteNotification, json_conjure, text_conjure, bytes_conjure
+from conjure.indexes import TextIndex, VectorIndex
+from conjure.index_store import SqliteIndexStore
 from conjure.identifier import FunctionContentIdentifier, LiteralFunctionIdentifier, LiteralParamsIdentifier, ParamsHash
 from conjure.serialize import JSONDeserializer, JSONSerializer
 from conjure.serve import serve_conjure
@@ -42,8 +44,15 @@ class DecorateTests(TestCase):
         self.path = f'tests/tmp/{v4().hex}'
         self.db = self.collection_class(self.path)
 
+        # SqliteCollection keeps indices in its own file by default, while
+        # other storage needs a separate index store
+        self.index_store = None if self.collection_class is SqliteCollection \
+            else SqliteIndexStore(f'{self.path}.indices.sqlite')
+
     def tearDown(self) -> None:
         self.db.destroy()
+        if self.index_store is not None:
+            self.index_store.destroy()
 
         if self.process is not None and self.process.is_alive():
             self.process.join(5)
@@ -371,122 +380,178 @@ class DecorateTests(TestCase):
         self.assertIn('__deserialized', retrieved)
     
 
-    def test_can_create_index_after_initial_function_creation(self):
-        content = {
-            'a': 'lights in the sky',
-            'b': 'look to the sky',
-            'c': 'I look at the sky and the sky looks at me'
-        }
+    # indices ###############################################################
 
-        @text_conjure(self.db)
+    SKY_CONTENT = {
+        'a': 'lights in the sky',
+        'b': 'look to the sky',
+        'c': 'I look at the sky and the sky looks at me'
+    }
+
+    def content_index(self, calls: list = None):
+        def extract(result, key):
+            """
+            The full text of each document
+            """
+            if calls is not None:
+                calls.append(key)
+            return result
+
+        return TextIndex('content', extract=extract)
+
+    def test_indices_need_an_index_store_when_there_is_no_default(self):
+        if self.index_store is None:
+            self.skipTest(f'{self.collection_class.__name__} has a default index store')
+
+        def define():
+            @text_conjure(self.db, indices=[self.content_index()])
+            def fetch_content(key):
+                return self.SKY_CONTENT[key]
+
+        self.assertRaises(TypeError, define)
+
+    def test_can_create_index_after_initial_function_creation(self):
+        content = self.SKY_CONTENT
+
         def fetch_content(key):
             return content[key]
 
-        fetch_content('a')
-        fetch_content('b')
-        fetch_content('c')
+        unindexed = text_conjure(self.db)(fetch_content)
+        unindexed('a')
+        unindexed('b')
+        unindexed('c')
 
-        @conjure_index(fetch_content, self.db.index_storage('content_index'))
-        def content_index(key: bytes, result: str, *args, **kwargs):
-            words = result.split()
-            for word in words:
-                yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
+        indexed = text_conjure(self.db, index_store=self.index_store, indices=[self.content_index()])(fetch_content)
+        self.assertEqual([], indexed.indices.content.search('sky'))
 
-        content_index.index()
+        # cache hits index results that were computed before the index existed
+        indexed('a')
+        indexed('b')
+        indexed('c')
 
-        results = content_index.search('sky')
-        self.assertEqual(3, len(results))
-        best = results[0]
-
-        self.assertEqual(content['c'], best['content'])
+        hits = indexed.indices.content.search('sky')
+        self.assertEqual(3, len(hits))
+        self.assertEqual(
+            {indexed.key(k) for k in content}, {hit.key for hit in hits})
 
     def test_can_index_and_search(self):
-
         content = {
             'a': 'lights in the sky',
             'b': 'look to the sky'
         }
 
-        @text_conjure(self.db)
+        @text_conjure(self.db, index_store=self.index_store, indices=[self.content_index()])
         def fetch_content(key):
             return content[key]
-
-        @conjure_index(fetch_content, self.db.index_storage('content_index'))
-        def content_index(key: bytes, result: str, *args, **kwargs):
-            words = result.split()
-            for word in words:
-                yield word.lower(), dict(key=ensure_str(key))
 
         fetch_content('a')
         fetch_content('b')
 
-        results = content_index.search('sky')
-        self.assertEqual(2, len(results))
-
-        results = content_index.search('lights')
-        self.assertEqual(1, len(results))
+        self.assertEqual(2, len(fetch_content.indices.content.search('sky')))
+        self.assertEqual(
+            [fetch_content.key('a')],
+            [hit.key for hit in fetch_content.indices.content.search('lights')])
 
     def test_can_index_incrementally(self):
+        content = self.SKY_CONTENT
+        calls = []
 
-        content = {
-            'a': 'lights in the sky',
-            'b': 'look to the sky',
-            'c': 'I look at the sky and the sky looks at me'
-        }
-
-        @text_conjure(self.db)
+        @text_conjure(self.db, index_store=self.index_store, indices=[self.content_index(calls)])
         def fetch_content(key):
             return content[key]
 
-        def content_index_func(key: bytes, result: str, *args, **kwargs):
-            words = result.split()
-            for word in words:
-                yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
-
-        content_index = Index(
-            name='content_index',
-            collection=self.db.index_storage('content_index'),
-            conjure=fetch_content,
-            register_listener=False,
-            func=content_index_func
-        )
-
         fetch_content('a')
         fetch_content('b')
-        content_index.index()
-        self.assertEqual(2, content_index.keys_processed_in_current_session)
+        self.assertEqual(['a', 'b'], calls)
+        self.assertEqual(2, len(fetch_content.indices.content))
 
         fetch_content('c')
-        content_index.index()
-        self.assertEqual(3, content_index.keys_processed_in_current_session)
+        self.assertEqual(['a', 'b', 'c'], calls)
+        self.assertEqual(3, len(fetch_content.indices.content))
+
+        # each result is indexed only once
+        fetch_content('a')
+        fetch_content('c')
+        self.assertEqual(['a', 'b', 'c'], calls)
 
     def test_can_index_and_rank_by_relevance(self):
-
         content = {
-            'a': 'lights in the sky',
-            'b': 'look to the sky',
-            'c': 'I look at the sky and the sky looks at me'
+            'a': 'the sky over the hills and the valleys and the rivers',
+            'b': 'sky sky sky',
+            'c': 'a clear sky tonight',
         }
 
-        @text_conjure(self.db)
+        @text_conjure(self.db, index_store=self.index_store, indices=[self.content_index()])
         def fetch_content(key):
             return content[key]
 
-        @conjure_index(fetch_content, self.db.index_storage('content_index'))
-        def content_index(key: bytes, result: str, *args, **kwargs):
-            words = result.split()
-            for word in words:
-                yield word.lower(), dict(key=ensure_str(key), content=ensure_str(result))
+        for key in content:
+            fetch_content(key)
 
-        fetch_content('a')
-        fetch_content('b')
-        fetch_content('c')
+        hits = fetch_content.indices.content.search('sky')
+        self.assertEqual(3, len(hits))
 
-        results = content_index.search('sky')
-        self.assertEqual(3, len(results))
-        best = results[0]
+        # BM25 favors documents where the term is frequent, relative to length
+        self.assertEqual(
+            [fetch_content.key(k) for k in ['b', 'c', 'a']],
+            [hit.key for hit in hits])
+        scores = [hit.score for hit in hits]
+        self.assertEqual(sorted(scores), scores)
 
-        self.assertEqual(content['c'], best['content'])
+    def test_can_search_text_index_over_http(self):
+        content = self.SKY_CONTENT
+        port = self.serve_port + 100
+
+        @text_conjure(self.db, index_store=self.index_store, indices=[
+            self.content_index(),
+            VectorIndex('lengths', dim=1, extract=lambda result, key: [len(result)]),
+        ])
+        def fetch_content(key):
+            return content[key]
+
+        for key in content:
+            fetch_content(key)
+
+        self.process = serve_conjure([fetch_content], port=port, n_workers=2, revive=False)
+        base = f'http://localhost:{port}/functions/{fetch_content.identifier}'
+
+        def search():
+            resp = requests.get(f'{base}/indexes/content', params={'q': 'look'})
+            self.assertEqual(200, resp.status_code)
+            hits = resp.json()
+            self.assertEqual(
+                {ensure_str(fetch_content.key(k)) for k in ['b', 'c']},
+                {hit['key'] for hit in hits})
+            for hit in hits:
+                self.assertIsInstance(hit['score'], float)
+
+            result = requests.get(f'http://localhost:{port}{hits[0]["url"]}')
+            self.assertEqual(200, result.status_code)
+            self.assertIn(result.content.decode(), content.values())
+
+        retry(search)
+
+        resp = requests.get(f'{base}/indexes/content', params={'q': 'sky', 'limit': 2})
+        self.assertEqual(2, len(resp.json()))
+
+        resp = requests.get(f'{base}/indexes/content', params={'q': ''})
+        self.assertEqual([], resp.json())
+
+        # vector indices can't be searched with a query string
+        resp = requests.get(f'{base}/indexes/lengths', params={'q': 'sky'})
+        self.assertEqual(400, resp.status_code)
+
+        resp = requests.get(f'{base}/indexes/missing', params={'q': 'sky'})
+        self.assertEqual(404, resp.status_code)
+
+        listing = requests.get(base).json()
+        self.assertEqual([], listing['indexes'])
+        self.assertEqual(
+            {'content': 'text', 'lengths': 'vector'},
+            {i['name']: i['type'] for i in listing['indices']})
+        content_summary = [i for i in listing['indices'] if i['name'] == 'content'][0]
+        self.assertIn('full text', content_summary['description'])
+        self.assertIsNotNone(content_summary['search'])
 
 
 class SqliteDecorateTests(DecorateTests):

@@ -9,5 +9,6 @@ requests
 markdown
 inotify
 matplotlib
+sqlite-vec
 soundfile
 traitlets

@@ -1,12 +1,13 @@
 from typing import List, Union
 from urllib.parse import ParseResult, urlparse
 import falcon
-from conjure.decorate import Conjure, Index
+from conjure.decorate import Conjure
+from conjure.indexes import ConjureIndex, TextIndex
 import multiprocessing
 import gunicorn.app.base
 import sys
 import os
-from collections import defaultdict
+from markdown import markdown
 
 from conjure.storage import ensure_str
 
@@ -51,16 +52,23 @@ class ListFunctions(object):
         res.status = falcon.HTTP_OK
 
 
+def index_summary(func: Conjure, index: ConjureIndex) -> dict:
+    description = '\n'.join(
+        line.strip() for line in (index.extract.__doc__ or '').split('\n'))
+    return {
+        'name': index.name,
+        'type': index.kind,
+        'description': markdown(description),
+        # only text indices can be searched with a query string
+        'search': f'/functions/{func.identifier}/indexes/{index.name}?q='
+            if isinstance(index, TextIndex) else None,
+    }
+
+
 class Function(object):
-    def __init__(self, functions: List[Conjure], indexes: List[Index] = []):
+    def __init__(self, functions: List[Conjure]):
         super().__init__()
         self.functions = {f.identifier: f for f in functions}
-        # organize indexes
-        grouped_indexes: dict[List[Index]] = defaultdict(list)
-        for index in indexes:
-            grouped_indexes[index.conjure_identifier].append(index)
-
-        self.grouped = grouped_indexes
 
     def on_get(self, req: falcon.Request, res: falcon.Response, identifier: str):
         try:
@@ -73,22 +81,25 @@ class Function(object):
                 'url': f'/functions/{func.identifier}',
                 'feed': f'/feed/{func.identifier}',
                 'keys': list(k.decode() for k in func.iter_keys())[:10],
-                'indexes': list(map(lambda x: dict(name=x.name, description=x.description_html), self.grouped.get(identifier, [])))
+                # the dashboard doesn't yet support indices
+                'indexes': [],
+                'indices': [index_summary(func, index) for index in func.indices],
             }
         except KeyError:
             res.status = falcon.HTTP_NOT_FOUND
 
 
 class FunctionIndex(object):
-    def __init__(self, functions: List[Conjure], indexes: List[Index]):
+    """
+    Search one of a function's text indices with a query string, e.g.
+    /functions/{identifier}/indexes/{index_name}?q=some+words&limit=10
+    """
+
+    DEFAULT_LIMIT = 25
+
+    def __init__(self, functions: List[Conjure]):
         super().__init__()
-
-        # organize indexes
-        grouped_indexes: dict[List[Index]] = defaultdict(list)
-        for index in indexes:
-            grouped_indexes[index.conjure_identifier].append(index)
-
-        self.grouped = grouped_indexes
+        self.functions = {f.identifier: f for f in functions}
 
     def on_get(
             self,
@@ -98,19 +109,30 @@ class FunctionIndex(object):
             index_name: str):
 
         try:
-            candidates = self.grouped[identifier]
-            filtered_candidates = list(filter(lambda x: x.name == index_name, candidates))
-            candidate: Index = filtered_candidates[0]
-            query = req.params['q']
-            
-            if not query:
-                res.media = []
-                return
-            
-            results = candidate.search(query)
-            res.media = results
-        except (KeyError, IndexError) as e:
+            func = self.functions[identifier]
+            index = func.indices[index_name]
+        except KeyError:
             res.status = falcon.HTTP_NOT_FOUND
+            return
+
+        if not isinstance(index, TextIndex):
+            res.status = falcon.HTTP_BAD_REQUEST
+            res.media = {
+                'error': f'{index.kind} indices cannot be searched with a query string'}
+            return
+
+        query = req.get_param('q') or ''
+        limit = req.get_param_as_int('limit', min_value=1) or self.DEFAULT_LIMIT
+
+        hits = index.search(query, limit=limit)
+        res.media = [
+            {
+                'key': ensure_str(hit.key),
+                'score': hit.score,
+                'url': f'/functions/{func.identifier}/{ensure_str(hit.key)}',
+            }
+            for hit in hits
+        ]
 
 
 class FunctionResult(object):
@@ -190,7 +212,6 @@ class MutliFunctionApplication(falcon.API):
     def __init__(
             self,
             conjure_funcs: List[Conjure],
-            indexes: List[Index] = [],
             port: int = None,
             web_component_version: str = None):
 
@@ -200,11 +221,11 @@ class MutliFunctionApplication(falcon.API):
 
         self.add_route('/functions', ListFunctions(conjure_funcs, port))
 
-        self.add_route('/functions/{identifier}', Function(conjure_funcs, indexes))
+        self.add_route('/functions/{identifier}', Function(conjure_funcs))
 
         self.add_route(
             '/functions/{identifier}/indexes/{index_name}', 
-            FunctionIndex(conjure_funcs, indexes))
+            FunctionIndex(conjure_funcs))
 
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',
@@ -239,11 +260,10 @@ def serve_conjure(
         port: int = 8888,
         n_workers: int = None,
         revive=True,
-        indexes: List[Index] = [],
         web_components_version: str = None):
 
     app = MutliFunctionApplication(
-        conjure_funcs, indexes=indexes, port=port, web_component_version=web_components_version)
+        conjure_funcs, port=port, web_component_version=web_components_version)
 
     def worker_int(worker):
         if not revive:

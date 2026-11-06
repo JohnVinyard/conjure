@@ -2,7 +2,7 @@ import re
 import numpy as np
 import requests
 from conjure.contenttype import SupportedContentType
-from conjure.decorate import audio_conjure, conjure_index, numpy_conjure, text_conjure, time_series_conjure
+from conjure.decorate import audio_conjure, numpy_conjure, text_conjure, time_series_conjure
 from conjure.serve import serve_conjure
 from conjure.storage import LmdbCollection, LocalCollectionWithBackup, ensure_str
 from time import sleep
@@ -183,24 +183,15 @@ def spectral_magnitude(arr: np.ndarray):
 #     resp = requests.get(url)
 #     return resp.content
 
-# @conjure_index(textfile, collection.index_storage('content_index'))
-# def content_index(key: bytes, result: str, *args, **kwargs):
-#     """
-
-#     #Word-Based Index
-
-#     Produce a...
-
-#     ```
-#     word -> [doc1, doc2]
-#     ```
-
-#     ...to document mapping
-
-#     """
-#     words = result.split()
-#     for word in words:
-#         yield word.lower(), dict(key=ensure_str(key), word_count=len(words))
+# Indices are declared on the conjured function itself (and require a
+# SqliteCollection), e.g.
+#
+# @text_conjure(collection, indices=[
+#     TextIndex('content', extract=lambda result, url: result),
+# ])
+# def textfile(url): ...
+#
+# textfile.indices.content.search('dragon')
 
 
 # def fetch_data():
@@ -215,8 +206,6 @@ if __name__ == '__main__':
 
     try:
         # fetch_data()
-        # print('indexing...')
-        # content_index.index()
 
 
         url = 'https://music-net.s3.amazonaws.com/1919'
@@ -242,9 +231,6 @@ if __name__ == '__main__':
                 scattering_like_transform,
                 samples_view,
                 spectral_magnitude
-            ],
-            indexes=[
-                # content_index
             ],
             port=9999,
             n_workers=2)

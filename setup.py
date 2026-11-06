@@ -33,6 +33,7 @@ setup(
     },
     install_requires=[
         'lmdb',
+        'sqlite-vec',
         'boto3',
         'numpy',
         'torch',

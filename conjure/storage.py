@@ -1,15 +1,14 @@
-from contextlib import contextmanager
 from enum import Enum
 import os
 from os import PathLike
 import sqlite3
-import threading
-from typing import Callable, Iterable, Iterator, Union
+from typing import Callable, Iterable, Union
 from urllib.parse import ParseResult, urlparse
 import lmdb
 import boto3
 from shutil import rmtree
 from conjure.timestamp import timestamp_id
+from conjure.sqlite import SqliteConnections, write_transaction
 
 
 def get_account_id():
@@ -277,13 +276,6 @@ class LmdbCollection(Collection):
             offset = txn.put(self._default_database_name, offset, db=self._offsets)
             return offset
     
-    def index_storage(self, name):
-        return LmdbCollection(
-            self.path, 
-            self.extract_base_key, 
-            default_database_name=name, 
-            build_feed=False)
-
     def destroy(self):
         self.env.close()
         rmtree(self.path)
@@ -379,8 +371,8 @@ class SqliteCollection(Collection):
     keeps working in the child processes.  Readers never block, and writers
     are serialized by SQLite, waiting up to `timeout` seconds for the lock.
 
-    Several logical collections can share one file (see `index_storage`);
-    each is identified by its `namespace`.
+    Several logical collections can share one file, by passing a different
+    `default_database_name` for each, which becomes its `namespace`.
 
     Note that WAL mode does not work on network filesystems.
     """
@@ -411,47 +403,18 @@ class SqliteCollection(Collection):
         self.timeout = timeout
         self._port = port
 
-        self._thread_local = threading.local()
-        self._connections_lock = threading.Lock()
-        self._connections = []
-
-        directory = os.path.dirname(self.path)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
+        self._connections = SqliteConnections(
+            self.path, timeout=timeout, on_connect=self._create_schema)
 
         # create the schema eagerly, so configuration problems surface early
         self._connection
 
     @property
     def _connection(self) -> sqlite3.Connection:
-        # connections must never cross a fork, and sqlite3 connections should
-        # not be shared between threads, so there's one per (process, thread)
-        pid = os.getpid()
-        conn = getattr(self._thread_local, 'conn', None)
-        if conn is not None and self._thread_local.pid == pid:
-            return conn
-
-        conn = self._connect()
-        self._thread_local.conn = conn
-        self._thread_local.pid = pid
-        with self._connections_lock:
-            self._connections.append((pid, conn))
-        return conn
-
-    def _connect(self) -> sqlite3.Connection:
-        # isolation_level=None means that transactions are managed explicitly
-        conn = sqlite3.connect(
-            self.path,
-            timeout=self.timeout,
-            isolation_level=None,
-            check_same_thread=False)
-        conn.execute('PRAGMA journal_mode=WAL')
-        conn.execute('PRAGMA synchronous=NORMAL')
-        self._create_schema(conn)
-        return conn
+        return self._connections.connection
 
     def _create_schema(self, conn: sqlite3.Connection):
-        with self._transaction(conn) as c:
+        with write_transaction(conn) as c:
             version = c.execute('PRAGMA user_version').fetchone()[0]
             if version == self.SCHEMA_VERSION:
                 return
@@ -485,28 +448,12 @@ class SqliteCollection(Collection):
             ''')
             c.execute(f'PRAGMA user_version = {self.SCHEMA_VERSION}')
 
-    @staticmethod
-    @contextmanager
-    def _transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
-        # IMMEDIATE takes the write lock up front, so the busy timeout applies,
-        # rather than failing when a read lock is later upgraded to a write lock
-        conn.execute('BEGIN IMMEDIATE')
-        try:
-            yield conn
-        except BaseException:
-            conn.execute('ROLLBACK')
-            raise
-        else:
-            conn.execute('COMMIT')
-
-    @contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
+    def transaction(self):
         """
         A write transaction on this process's connection.  Everything
         executed within it is committed atomically, or not at all.
         """
-        with self._transaction(self._connection) as conn:
-            yield conn
+        return self._connections.transaction()
 
     def public_uri(self, key: Union[bytes, str]):
         # TODO: This should be a subclass defined in serve.py
@@ -532,36 +479,14 @@ class SqliteCollection(Collection):
             'INSERT OR REPLACE INTO offsets (namespace, offset) VALUES (?, ?)',
             (self.namespace, ensure_bytes(offset)))
 
-    def index_storage(self, name):
-        return SqliteCollection(
-            self.path,
-            self.extract_base_key,
-            default_database_name=name,
-            build_feed=False,
-            timeout=self.timeout)
-
     def close(self):
         """
         Close every connection this instance opened in the current process
         """
-        pid = os.getpid()
-        with self._connections_lock:
-            remaining = []
-            for conn_pid, conn in self._connections:
-                if conn_pid == pid:
-                    conn.close()
-                else:
-                    remaining.append((conn_pid, conn))
-            self._connections = remaining
-        self._thread_local = threading.local()
+        self._connections.close()
 
     def destroy(self):
-        self.close()
-        for suffix in ('', '-wal', '-shm'):
-            try:
-                os.remove(f'{self.path}{suffix}')
-            except FileNotFoundError:
-                pass
+        self._connections.destroy()
 
     def _iter_range(
             self,
@@ -697,10 +622,8 @@ class LocalCollectionWithBackup(Collection):
     @property
     def offset(self):
         return self._local.offset
-    
-    def index_storage(self, name):
-        return self._local.index_storage(name)
-    
+
+
     def set_offset(self, offset):
         self._local.set_offset(offset)
     

@@ -322,22 +322,24 @@ class SqliteCollectionTests(TestCase):
     def test_offset_is_none_initially(self):
         self.assertIsNone(self.db.offset)
 
-    def test_index_storage_is_isolated_from_data(self):
-        index = self.db.index_storage('my_index')
+    def test_namespaces_sharing_a_file_are_isolated(self):
+        other = SqliteCollection(
+            self.path, default_database_name='other', build_feed=False)
 
         self.db.put(b'key', b'data value', self.content_type)
-        index.put(b'key', b'index value', self.content_type)
-        index.set_offset(b'some_offset')
+        other.put(b'key', b'other value', self.content_type)
+        other.set_offset(b'some_offset')
 
         self.assertEqual(b'data value', self.db[b'key'])
-        self.assertEqual(b'index value', index[b'key'])
-        self.assertEqual(b'some_offset', index.offset)
+        self.assertEqual(b'other value', other[b'key'])
+        self.assertEqual(b'some_offset', other.offset)
         self.assertNotEqual(b'some_offset', self.db.offset)
-        self.assertRaises(NotImplementedError, lambda: list(index.feed()))
+        self.assertRaises(NotImplementedError, lambda: list(other.feed()))
 
-        del index[b'key']
+        del other[b'key']
         self.assertIn(b'key', self.db)
-        self.assertNotIn(b'key', index)
+        self.assertNotIn(b'key', other)
+        other.close()
 
     def test_data_persists_after_reopening(self):
         self.db.put(b'key', b'value', self.content_type)
