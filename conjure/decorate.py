@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import Any, Callable, Iterable, Tuple, Union
+from typing import Any, Callable, Iterable, List, Tuple, Union
 from urllib.parse import ParseResult
 
 from markdown import markdown
@@ -180,12 +180,47 @@ class Conjure(object):
                 f'offset must start with {self.identifier} but was {offset}')
         return self.storage.feed(offset=final_offset)
 
-    def most_recent_key(self) -> str:
-        all_keys = list(self.feed())
-        return all_keys[-1]['key']
+    def recent_keys(self, limit: int = 10) -> List[bytes]:
+        """
+        Keys of the most recently stored results that still exist, newest
+        first.  A result that was stored more than once (e.g. recomputed)
+        appears once, at its most recent position.
+        """
+        keys = []
+        seen = set()
 
-    def most_recent_meta(self) -> MetaData:
+        # deleting a result doesn't remove its feed entries, so skip past
+        # entries for results that no longer exist
+        for item in reversed(list(self.feed())):
+            if len(keys) >= limit:
+                break
+
+            key = item['key']
+            if key in seen:
+                continue
+            seen.add(key)
+
+            if key in self.storage:
+                keys.append(key)
+
+        return keys
+
+    def most_recent_key(self) -> Union[bytes, None]:
+        """
+        The key of the most recently stored result that still exists, or
+        None if this function has no results
+        """
+        keys = self.recent_keys(limit=1)
+        return keys[0] if keys else None
+
+    def most_recent_meta(self) -> Union[MetaData, None]:
+        """
+        Metadata for the most recently stored result, or None if this
+        function has no results yet
+        """
         key = self.most_recent_key()
+        if key is None:
+            return None
         return self.meta_from_key(key)
 
     @property

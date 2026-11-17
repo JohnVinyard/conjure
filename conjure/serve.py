@@ -36,8 +36,23 @@ class ListFunctions(object):
 
         for x in funcs:
             meta = x.most_recent_meta()
-            meta = meta.with_public_uri(uri(self.port, x, meta.key))
-            
+            if meta is None:
+                # no results yet, but the feed can still be watched for the
+                # first one
+                meta_data = {
+                    'key': None,
+                    'public_uri': None,
+                    'content_type': x.content_type,
+                    'feed_uri': f'/feed/{ensure_str(x.identifier)}',
+                    'func_name': ensure_str(x.name),
+                    'func_identifier': ensure_str(x.identifier),
+                }
+            else:
+                meta_data = meta.with_public_uri(uri(self.port, x, meta.key)).conjure_data
+
+            # a stable URL for whichever result is newest
+            meta_data['latest_uri'] = f'/functions/{ensure_str(x.identifier)}/latest'
+
             results.append({
                 'id': x.identifier,
                 'name': x.name,
@@ -46,7 +61,7 @@ class ListFunctions(object):
                 'code': x.code,
                 'url': f'/functions/{x.identifier}',
                 'feed': f'/feed/{x.identifier}',
-                'meta': meta.conjure_data    
+                'meta': meta_data
             })
         res.media = results
         res.status = falcon.HTTP_OK
@@ -80,7 +95,8 @@ class Function(object):
                 'code': func.code,
                 'url': f'/functions/{func.identifier}',
                 'feed': f'/feed/{func.identifier}',
-                'keys': list(k.decode() for k in func.iter_keys())[:10],
+                # newest first
+                'keys': [ensure_str(k) for k in func.recent_keys(limit=10)],
                 # the dashboard doesn't yet support indices
                 'indexes': [],
                 'indices': [index_summary(func, index) for index in func.indices],
@@ -152,6 +168,70 @@ class FunctionResult(object):
             res.status = falcon.HTTP_NOT_FOUND
 
 
+class LatestFunctionResult(object):
+    """
+    The most recently stored result for a function, i.e. a shortcut for
+    reading the function's feed, and then requesting its last key.  Responds
+    with 404 if the function has no results yet.
+
+    The key that was served is in the X-Conjure-Key header, and is also the
+    ETag, so clients can poll cheaply, either with HEAD requests, or with
+    conditional GET requests, which return 304 Not Modified until a newer
+    result is stored.
+    """
+
+    KEY_HEADER = 'X-Conjure-Key'
+
+    def __init__(self, functions: List[Conjure]):
+        super().__init__()
+        self.functions = {f.identifier: f for f in functions}
+
+    def _latest(self, res: falcon.Response, identifier: str):
+        """
+        Set headers describing the latest result, and return its function
+        and key, or set a 404 status and return None
+        """
+        # the latest result changes over time, so caches must always revalidate
+        res.cache_control = ['no-cache']
+
+        func = self.functions.get(identifier)
+        key = None if func is None else func.most_recent_key()
+        if key is None:
+            res.status = falcon.HTTP_NOT_FOUND
+            return None
+
+        key = ensure_str(key)
+        res.set_header(self.KEY_HEADER, key)
+        res.etag = key
+        return func, key
+
+    def on_head(self, req: falcon.Request, res: falcon.Response, identifier: str):
+        self._latest(res, identifier)
+
+    def on_get(self, req: falcon.Request, res: falcon.Response, identifier: str):
+        latest = self._latest(res, identifier)
+        if latest is None:
+            return
+        func, key = latest
+
+        if req.if_none_match and any(
+                etag == '*' or etag == key for etag in req.if_none_match):
+            res.status = falcon.HTTP_NOT_MODIFIED
+            return
+
+        try:
+            result = func.get_raw(key)
+        except KeyError:
+            # the result was deleted after the feed was read
+            res.status = falcon.HTTP_NOT_FOUND
+            return
+
+        res.content_length = result.content_length
+        res.content_type = result.content_type
+        res.text = result.raw
+        res.status = falcon.HTTP_OK
+
+
 class FunctionFeed(object):
     def __init__(self, functions: List[Conjure]):
         super().__init__()
@@ -161,13 +241,24 @@ class FunctionFeed(object):
     def on_get(self, req: falcon.Request, res: falcon.Response, identifier: str):
         try:
             func = self.functions[identifier]
-            offset = req.get_param('offset')
-            items = list(func.feed(offset))  # [{ timestamp, key }]
-            res.media = list(
-                map(lambda x: {key: value.decode() for key, value in x.items()}, items))
-            res.status = falcon.HTTP_OK
         except KeyError:
             res.status = falcon.HTTP_NOT_FOUND
+            return
+
+        # a missing or empty offset means "from the start of the feed"
+        offset = req.get_param('offset') or None
+
+        try:
+            items = list(func.feed(offset))  # [{ timestamp, key }]
+        except ValueError as e:
+            # e.g. an offset belonging to another function's feed
+            res.status = falcon.HTTP_BAD_REQUEST
+            res.media = {'error': str(e)}
+            return
+
+        res.media = [
+            {key: value.decode() for key, value in item.items()} for item in items]
+        res.status = falcon.HTTP_OK
 
 
 class Dashboard(object):
@@ -228,6 +319,9 @@ class MutliFunctionApplication(falcon.API):
             FunctionIndex(conjure_funcs))
 
         self.add_route('/feed/{identifier}', FunctionFeed(conjure_funcs))
+        # falcon matches this literal path before the {key} route below
+        self.add_route(
+            '/functions/{identifier}/latest', LatestFunctionResult(conjure_funcs))
         self.add_route('/functions/{identifier}/{key}',
                        FunctionResult(conjure_funcs))
         self.add_route(

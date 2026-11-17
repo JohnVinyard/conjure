@@ -1,4 +1,5 @@
 import json
+import socket
 from multiprocessing import Process
 from time import sleep
 from typing import Union
@@ -21,6 +22,14 @@ from uuid import uuid4 as v4
 import numpy as np
 
 
+def free_port() -> int:
+    # ask the OS for an unused port, rather than hardcoding one that another
+    # local server might be using
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('localhost', 0))
+        return s.getsockname()[1]
+
+
 def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
     exc = None
     for i in range(max_tries):
@@ -37,10 +46,10 @@ def retry(func: Callable, max_tries: int = 10, wait_time_seconds=1):
 
 class DecorateTests(TestCase):
     collection_class = LmdbCollection
-    serve_port = 9999
 
     def setUp(self) -> None:
         self.process: Union[Process, None] = None
+        self.serve_port = free_port()
         self.path = f'tests/tmp/{v4().hex}'
         self.db = self.collection_class(self.path)
 
@@ -500,7 +509,7 @@ class DecorateTests(TestCase):
 
     def test_can_search_text_index_over_http(self):
         content = self.SKY_CONTENT
-        port = self.serve_port + 100
+        port = self.serve_port
 
         @text_conjure(self.db, index_store=self.index_store, indices=[
             self.content_index(),
@@ -556,4 +565,3 @@ class DecorateTests(TestCase):
 
 class SqliteDecorateTests(DecorateTests):
     collection_class = SqliteCollection
-    serve_port = 9998

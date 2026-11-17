@@ -275,6 +275,9 @@ for (let i = 0; i < COLOR_MAP.length; i++) {
 
 const fetchJSON = async (url) => {
   const resp = await fetch(url);
+  if (!resp.ok) {
+    throw new Error(`Request for ${url} failed with status ${resp.status}`);
+  }
   return resp.json();
 };
 
@@ -1326,7 +1329,9 @@ const conjure = async (
     metaData = null,
     style = { width: "500px", height: "500px" },
     refreshRate = null,
-    feedOffset = null,
+    // the key of the result currently displayed, if it differs from the
+    // element's original key (see the refresh logic below)
+    renderedKey = null,
   } = {
     style: { width: "500px", height: "500px" },
   }
@@ -1338,13 +1343,13 @@ const conjure = async (
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
       el.style.position = "relative";
-      await conjure({ element: el, refreshRate, feedOffset });
+      await conjure({ element: el, refreshRate, renderedKey });
     }
     return;
   }
 
   // extract the data about this specific conjure element
-  const { key, public_uri, content_type, feed_uri, func_identifier } =
+  const { key, public_uri, content_type, latest_uri, func_identifier } =
     metaData === null
       ? JSON.parse(element.getAttribute("data-conjure"))
       : metaData;
@@ -1368,74 +1373,102 @@ const conjure = async (
     "text/plain": "div",
   };
 
-  // here, I need to check if there's already a renderer instance created,
-  // update its data, and re-render
-
-  const containerId = `display-${key}`;
-
-  // undefined or an *instance* of a view class
-  const existing = VIEW_CACHE[containerId];
-
-  const renderer = contentTypeToRenderClass[content_type];
-  const rootElement = contentTypeToRootElementType[content_type];
-
-  const root = element;
-
-  if (!existing) {
-    root.innerHTML = "";
-    const container = document.createElement(rootElement);
-    container.style.width = style.width;
-    container.style.height = style.height;
-    container.id = containerId;
-    root.appendChild(container);
-    console.log(`New view for ${containerId}`);
+  if (!key) {
+    // this function has no results yet.  If there's a refresh rate, the feed
+    // is still checked below, and the first result is rendered when it arrives
+    element.innerHTML = "";
+    const placeholder = document.createElement("p");
+    placeholder.className = "no-results";
+    placeholder.innerText = "No results yet";
+    element.appendChild(placeholder);
   } else {
-    console.log(`Existing view for ${containerId}`);
+    // here, I need to check if there's already a renderer instance created,
+    // update its data, and re-render
+
+    const containerId = `display-${key}`;
+
+    // undefined or an *instance* of a view class
+    const existing = VIEW_CACHE[containerId];
+
+    const renderer = contentTypeToRenderClass[content_type];
+    const rootElement = contentTypeToRootElementType[content_type];
+
+    const root = element;
+
+    if (!existing) {
+      root.innerHTML = "";
+      const container = document.createElement(rootElement);
+      container.style.width = style.width;
+      container.style.height = style.height;
+      container.id = containerId;
+      root.appendChild(container);
+      console.log(`New view for ${containerId}`);
+    } else {
+      console.log(`Existing view for ${containerId}`);
+    }
+
+    const view = await renderer.renderURL(public_uri, containerId, existing);
+    VIEW_CACHE[containerId] = view;
   }
 
-  const view = await renderer.renderURL(public_uri, containerId, existing);
-  VIEW_CACHE[containerId] = view;
+  // If there's a refresh rate, periodically check which result is the
+  // function's latest, and re-render when it changes.  A HEAD request
+  // returns just the latest key, without transferring the result itself.
+  const latestUri =
+    latest_uri || (func_identifier ? `/functions/${func_identifier}/latest` : null);
+  const currentKey = renderedKey || key;
 
-  // TODO: If there's a refresh rate specified, periodically
-  // check the feed.  If there's an item with a timestamp larger
-  // than the one we've got, call conjure again with the same
-  // refresh rate and the new highest offset
-
-  if (refreshRate !== null && feed_uri) {
+  if (refreshRate !== null && latestUri) {
     const interval = setInterval(async () => {
-      const searchParams = new URLSearchParams();
-
-      if (feedOffset) {
-        searchParams.append("offset", feedOffset);
+      let resp;
+      try {
+        resp = await fetch(latestUri, { method: "HEAD" });
+      } catch (err) {
+        // keep polling; the server may be restarting
+        console.error(`Failed to check latest result: ${err}`);
+        return;
       }
 
-      const feed = await fetch(`${feed_uri}?${searchParams}`).then((resp) =>
-        resp.json()
-      );
-      const onlyNew = feed.filter((item) => item.timestamp !== feedOffset);
-      console.log(`Checked feed and found ${onlyNew.length} new items`);
-      if (onlyNew.length) {
-        const index = onlyNew.length - 1;
-        const { key, timestamp } = onlyNew[index];
-        element.id = `id-${key}`;
-        const origMetadata = JSON.parse(element.getAttribute("data-conjure"));
-        const parts = origMetadata.public_uri.split("/").slice(0, -1);
-        const newPublicUri = [...parts, key].join("/");
-
-        const newMetaData = {
-          ...origMetadata,
-          public_uri: newPublicUri,
-        };
-
-        element.setAttribute("data-conjure", JSON.stringify(newMetaData));
-        clearInterval(interval);
-        await conjure({
-          element,
-          newMetaData,
-          refreshRate,
-          feedOffset: timestamp,
-        });
+      if (resp.status === 404) {
+        // no results yet
+        return;
       }
+
+      if (!resp.ok) {
+        console.error(`Checking ${latestUri} failed with status ${resp.status}`);
+        return;
+      }
+
+      const latestKey = resp.headers.get("X-Conjure-Key");
+      if (!latestKey || latestKey === currentKey) {
+        return;
+      }
+
+      console.log(`Found a newer result, ${latestKey}`);
+      element.id = `id-${latestKey}`;
+      const origMetadata = JSON.parse(element.getAttribute("data-conjure"));
+
+      // functions with no results yet have no public_uri to start from
+      const newPublicUri = origMetadata.public_uri
+        ? [...origMetadata.public_uri.split("/").slice(0, -1), latestKey].join("/")
+        : `${window.location.origin}/functions/${origMetadata.func_identifier}/${latestKey}`;
+
+      const newMetaData = {
+        ...origMetadata,
+        // keep an existing key, so the existing view is updated in place,
+        // but set one if there wasn't any, so the result gets rendered
+        key: origMetadata.key || latestKey,
+        public_uri: newPublicUri,
+      };
+
+      element.setAttribute("data-conjure", JSON.stringify(newMetaData));
+      clearInterval(interval);
+      await conjure({
+        element,
+        metaData: newMetaData,
+        refreshRate,
+        renderedKey: latestKey,
+      });
     }, refreshRate);
   }
 };
